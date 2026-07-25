@@ -1,0 +1,63 @@
+:root {
+  /* Semantic foundations. Components should consume these rather than literal colors. */
+  --bg-primary: #0f1729;
+  --bg-secondary: #1a2332;
+  --bg-card: #222d3f;
+  --bg-subtle: #162033;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent-color: #4f7cff;
+  --accent-gradient: linear-gradient(135deg, #4f7cff 0%, #7c5cfc 100%);
+  --accent-gradient-hover: linear-gradient(135deg, #618bff 0%, #8a6dff 100%);
+  --success-color: #22c55e;
+  --warning-color: #f59e0b;
+  --danger-color: #ef4444;
+  --border-color: #2e3a4e;
+  --bg-elevated: rgba(15, 23, 41, 0.55);
+  --nav-bg: rgba(26, 35, 50, 0.96);
+  --accent-soft: rgba(79, 124, 255, 0.16);
+  --accent-hover: rgba(79, 124, 255, 0.06);
+  --success-soft: rgba(34, 197, 94, 0.15);
+  --warning-soft: rgba(245, 158, 11, 0.14);
+  --danger-soft: rgba(239, 68, 68, 0.14);
+  --focus-ring: 0 0 0 3px rgba(79, 124, 255, 0.28);
+  --shadow-sm: 0 1px 2px rgba(3, 7, 18, 0.22);
+  --shadow-md: 0 10px 26px rgba(3, 7, 18, 0.22);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --font-caption: 12px;
+  --font-body: 14px;
+  --font-title: 20px;
+  --transition-fast: 160ms ease;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+}
+
+[data-theme="light"] {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-card: #f1f5f9;
+  --bg-subtle: #f8fafc;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --border-color: #e2e8f0;
+  --bg-elevated: #f8fafc;
+  --nav-bg: rgba(255, 255, 255, 0.96);
+  --accent-soft: rgba(79, 124, 255, 0.12);
+  --accent-hover: rgba(79, 124, 255, 0.07);
+  --success-soft: rgba(34, 197, 94, 0.12);
+  --warning-soft: rgba(245, 158, 11, 0.12);
+  --danger-soft: rgba(239, 68, 68, 0.1);
+  --focus-ring: 0 0 0 3px rgba(65, 111, 243, 0.22);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.07);
+  --shadow-md: 0 10px 26px rgba(15, 23, 42, 0.09);
+  --accent-gradient: linear-gradient(135deg, #416ff3 0%, #4f7cff 100%);
+  --accent-gradient-hover: linear-gradient(135deg, #315fdf 0%, #416ff3 100%);
+}

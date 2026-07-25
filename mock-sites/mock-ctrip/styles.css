@@ -1,0 +1,96 @@
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #f5f7fa;
+  color: #333;
+}
+.header {
+  background: #0086f6;
+  color: #fff;
+  padding: 16px 24px;
+  font-size: 20px;
+  font-weight: bold;
+}
+.container {
+  max-width: 800px;
+  margin: 24px auto;
+  background: #fff;
+  padding: 24px;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+.form-group {
+  margin-bottom: 16px;
+}
+label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+button {
+  background: #0086f6;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  font-size: 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.route-info {
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eee;
+}
+.ctrip-flight-card {
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fff;
+}
+.flight-main {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+.ctrip-flight-num {
+  font-weight: bold;
+  color: #0086f6;
+}
+.time-group {
+  text-align: center;
+}
+.ctrip-dep-time,
+.ctrip-arr-time {
+  font-size: 20px;
+  font-weight: bold;
+}
+.ctrip-dep-airport,
+.ctrip-arr-airport {
+  font-size: 12px;
+  color: #666;
+}
+.ctrip-price-text {
+  font-size: 22px;
+  font-weight: bold;
+  color: #ff5d23;
+}
+.ctrip-expand-btn {
+  font-size: 12px;
+  color: #0086f6;
+  cursor: pointer;
+  margin-top: 4px;
+}

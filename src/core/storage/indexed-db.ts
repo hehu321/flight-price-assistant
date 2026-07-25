@@ -1,0 +1,55 @@
+import { openDB, IDBPDatabase } from "idb";
+import { LocalPriceRecord, FavoriteRoute, PriceWatch, QuerySnapshot } from "@/shared/types/storage";
+import { AgentClient, AgentRun } from "@/shared/types/agent";
+
+const DB_NAME = "FlightPriceAssistantDB";
+const DB_VERSION = 3;
+
+export interface FlightPriceDB {
+  priceRecords: LocalPriceRecord;
+  favoriteRoutes: FavoriteRoute;
+  querySnapshots: QuerySnapshot;
+  priceWatches: PriceWatch;
+  agentRuns: AgentRun;
+  agentClients: AgentClient;
+}
+
+let dbPromise: Promise<IDBPDatabase<FlightPriceDB>> | null = null;
+
+export function getDB(): Promise<IDBPDatabase<FlightPriceDB>> {
+  if (!dbPromise) {
+    dbPromise = openDB<FlightPriceDB>(DB_NAME, DB_VERSION, {
+      upgrade(db) {
+        if (!db.objectStoreNames.contains("priceRecords")) {
+          const store = db.createObjectStore("priceRecords", { keyPath: "id" });
+          store.createIndex("by_platform", "platform");
+          store.createIndex("by_route", ["originCityCode", "destinationCityCode"]);
+          store.createIndex("by_flightNumber", "flightNumber");
+          store.createIndex("by_collectedAt", "collectedAt");
+        }
+        if (!db.objectStoreNames.contains("favoriteRoutes")) {
+          db.createObjectStore("favoriteRoutes", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("querySnapshots")) {
+          const store = db.createObjectStore("querySnapshots", { keyPath: "id" });
+          store.createIndex("by_journeyKey", "journeyKey");
+          store.createIndex("by_updatedAt", "updatedAt");
+        }
+        if (!db.objectStoreNames.contains("priceWatches")) {
+          const store = db.createObjectStore("priceWatches", { keyPath: "id" });
+          store.createIndex("by_journeyKey", "journeyKey");
+        }
+        if (!db.objectStoreNames.contains("agentRuns")) {
+          const store = db.createObjectStore("agentRuns", { keyPath: "id" });
+          store.createIndex("by_client_request", ["clientId", "requestId"], { unique: true });
+          store.createIndex("by_updatedAt", "updatedAt");
+        }
+        if (!db.objectStoreNames.contains("agentClients")) {
+          const store = db.createObjectStore("agentClients", { keyPath: "id" });
+          store.createIndex("by_status", "status");
+        }
+      },
+    });
+  }
+  return dbPromise;
+}

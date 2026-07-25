@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="58" y1="44" x2="460" y2="474" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#16233C"/>
+      <stop offset="1" stop-color="#0C1426"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="132" y1="126" x2="382" y2="395" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#50A7FF"/>
+      <stop offset="1" stop-color="#765DFF"/>
+    </linearGradient>
+    <filter id="glow" x="55" y="76" width="402" height="364" filterUnits="userSpaceOnUse">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="18" y="18" width="476" height="476" rx="118" fill="url(#bg)"/>
+  <rect x="24" y="24" width="464" height="464" rx="112" stroke="#405477" stroke-width="12"/>
+  <circle cx="390" cy="124" r="34" fill="#243B66"/>
+  <path d="M390 96v56M362 124h56" stroke="#7AA7FF" stroke-width="12" stroke-linecap="round"/>
+  <g filter="url(#glow)">
+    <path d="M102 321c0-13 11-24 24-24h41V216c0-13 11-24 24-24s24 11 24 24v81h48v-130c0-13 11-24 24-24s24 11 24 24v130h48v-63c0-13 11-24 24-24s24 11 24 24v87c0 13-11 24-24 24H126c-13 0-24-11-24-24Z" fill="url(#accent)"/>
+    <path d="M102 361h308" stroke="#4D78E9" stroke-width="22" stroke-linecap="round"/>
+  </g>
+  <path d="M165 153c8-7 19-9 28-5l53 25 70-70c8-8 20-9 29-3l4 3-56 88 58 61c5 6 5 14 0 20-5 5-13 6-19 2l-75-45-51 50c-8 8-20 9-29 3l-4-3 31-66-45-44c-7-7-7-18 0-25Z" fill="#F5F8FF"/>
+  <path d="m158 206 45 44-31 66c-2 5 4 9 8 5l51-50 75 45c6 4 14 3 19-2" stroke="#B9CEFF" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

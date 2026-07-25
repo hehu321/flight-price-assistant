@@ -1,0 +1,20 @@
+# Dependencies and generated extension bundles
+node_modules/
+dist/
+coverage/
+
+# Local diagnostics, browser artifacts, and development logs
+.audit/
+*.log
+*.tmp
+
+# Local environment and native-host installation details
+.env
+.env.*
+!.env.example
+*.local
+
+# Editor and operating-system metadata
+.DS_Store
+.idea/
+.vscode/

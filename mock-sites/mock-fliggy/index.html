@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>飞猪旅行 - 模拟首页</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="header">飞猪旅行 Fliggy (模拟平台)</div>
+    <div class="container">
+      <h2>机票搜寻 (含城市下拉候选项)</h2>
+      <div class="form-group" style="position: relative;">
+        <label>出发城市</label>
+        <input type="text" data-fliggy-input="origin" id="depCityName" placeholder="输入城市自动匹配" />
+        <div id="originOptions" class="option-dropdown" style="display: none;">
+          <div class="fliggy-option-item">武汉 (WUH)</div>
+          <div class="fliggy-option-item">北京 (BJS)</div>
+          <div class="fliggy-option-item">上海 (SHA)</div>
+        </div>
+      </div>
+      <div class="form-group" style="position: relative;">
+        <label>到达城市</label>
+        <input type="text" data-fliggy-input="destination" id="arrCityName" placeholder="输入城市自动匹配" />
+        <div id="destOptions" class="option-dropdown" style="display: none;">
+          <div class="fliggy-option-item">北京 (BJS)</div>
+          <div class="fliggy-option-item">广州 (CAN)</div>
+          <div class="fliggy-option-item">深圳 (SZX)</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>出发日期</label>
+        <input type="text" data-fliggy-input="date" id="depDate" value="2026-08-16" />
+      </div>
+      <button data-fliggy-btn="search" id="fliggySearchBtn">搜索飞猪机票</button>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>

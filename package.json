@@ -1,0 +1,51 @@
+{
+  "name": "flight-price-assistant",
+  "version": "0.1.0",
+  "description": "机票多平台比价与价格趋势分析 Chrome 浏览器插件",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc && vite build",
+    "typecheck": "vue-tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write \"src/**/*.{ts,vue,css,html}\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "bridge:build": "node --check agent-bridge/native-host.mjs && node --check agent-bridge/mcp-server.mjs && node --check agent-bridge/install-common.mjs && node --check agent-bridge/install-mac.mjs && node --check agent-bridge/setup-mac.mjs",
+    "bridge:install:mac": "node agent-bridge/install-mac.mjs",
+    "bridge:doctor": "node agent-bridge/doctor.mjs",
+    "bridge:uninstall:mac": "node agent-bridge/uninstall-mac.mjs",
+    "bridge:mcp": "node agent-bridge/mcp-server.mjs",
+    "agent:setup": "node agent-bridge/setup-mac.mjs",
+    "mock:ctrip": "vite mock-sites/mock-ctrip --port 3001 --strictPort",
+    "mock:qunar": "vite mock-sites/mock-qunar --port 3002 --strictPort",
+    "mock:fliggy": "vite mock-sites/mock-fliggy --port 3003 --strictPort"
+  },
+  "dependencies": {
+    "@ant-design/icons-vue": "^7.0.1",
+    "ant-design-vue": "^4.2.6",
+    "chart.js": "^4.4.1",
+    "idb": "^8.0.0",
+    "pinia": "^2.1.7",
+    "vue": "^3.4.15",
+    "vue-i18n": "^9.9.0",
+    "vue-router": "^4.2.5"
+  },
+  "devDependencies": {
+    "@crxjs/vite-plugin": "^2.0.0-beta.23",
+    "@types/chrome": "^0.0.260",
+    "@types/node": "^20.11.16",
+    "@typescript-eslint/eslint-plugin": "^6.20.0",
+    "@typescript-eslint/parser": "^6.20.0",
+    "@vitejs/plugin-vue": "^5.0.3",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-vue": "^9.21.1",
+    "jsdom": "^24.0.0",
+    "prettier": "^3.2.5",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.12",
+    "vitest": "^1.2.2",
+    "vue-tsc": "^3.3.8"
+  }
+}

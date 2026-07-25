@@ -1,0 +1,137 @@
+@import "./variables.css";
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: var(--font-body);
+  line-height: 1.5;
+  width: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+button, input, select, textarea {
+  font: inherit;
+}
+
+button:focus-visible, a:focus-visible, [tabindex]:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.ant-btn {
+  font-weight: 600;
+  min-height: 32px;
+  border-radius: 8px;
+  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.ant-btn-primary {
+  background: var(--accent-gradient);
+  border: 0;
+}
+
+.ant-btn-primary:not(:disabled):hover {
+  background: var(--accent-gradient-hover);
+}
+
+.ant-select-selector,
+.ant-picker,
+.ant-input-number,
+.ant-auto-complete .ant-select-selector {
+  background: var(--bg-primary) !important;
+  border-color: var(--border-color) !important;
+  box-shadow: none !important;
+}
+
+.ant-select-focused .ant-select-selector,
+.ant-picker-focused,
+.ant-input-number-focused {
+  border-color: var(--accent-color) !important;
+  box-shadow: 0 0 0 2px rgba(79, 124, 255, 0.18) !important;
+}
+
+.ant-select-selection-item,
+.ant-picker-input > input,
+.ant-input-number-input {
+  color: var(--text-primary) !important;
+}
+
+.ant-select-dropdown,
+.ant-picker-dropdown .ant-picker-panel-container {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-color);
+}
+
+.ant-select-item-option-active:not(.ant-select-item-option-disabled),
+.ant-picker-cell-in-view.ant-picker-cell-selected .ant-picker-cell-inner {
+  background: rgba(79, 124, 255, 0.22) !important;
+}
+
+.ant-radio-button-wrapper {
+  min-width: 76px;
+  text-align: center;
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+  border-color: var(--border-color);
+}
+
+.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled) {
+  color: #fff;
+  background: var(--accent-gradient);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.ant-tag {
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.ant-drawer-content,
+.ant-modal-content {
+  background: var(--bg-secondary) !important;
+}
+
+.ant-drawer-header,
+.ant-modal-header,
+.ant-modal-footer {
+  background: transparent !important;
+  border-color: var(--border-color) !important;
+}
+
+.ant-drawer-title,
+.ant-modal-title,
+.ant-modal-close,
+.ant-tabs-tab,
+.ant-segmented-item-label {
+  color: var(--text-primary) !important;
+}
+
+.ant-tabs-nav::before {
+  border-color: var(--border-color) !important;
+}
+
+.ant-segmented {
+  padding: 4px;
+  background: var(--bg-card) !important;
+}
+
+.ant-segmented-item-selected {
+  background: var(--bg-secondary) !important;
+  box-shadow: var(--shadow-sm) !important;
+}

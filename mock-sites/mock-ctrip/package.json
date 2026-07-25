@@ -1,0 +1,11 @@
+{
+  "name": "mock-ctrip",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite"
+  },
+  "devDependencies": {
+    "vite": "^5.0.12"
+  }
+}
