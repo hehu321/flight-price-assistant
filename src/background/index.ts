@@ -2,6 +2,8 @@ import { handleMessage } from "./message-router";
 import { initNavigationListener } from "./navigation-listener";
 import { logger } from "@/shared/logger/logger";
 import { agentNativeBridge } from "./agent-native-bridge";
+import { priceMonitorCoordinator } from "./price-monitor-coordinator";
+import { taskManager } from "./task-manager";
 
 logger.info("Service Worker 初始化中...");
 
@@ -12,4 +14,6 @@ if (typeof chrome !== "undefined" && chrome.runtime) {
   });
   initNavigationListener();
   agentNativeBridge.start();
+  taskManager.subscribe((task, results) => void priceMonitorCoordinator.handleTaskUpdate(task, results));
+  void priceMonitorCoordinator.initialize();
 }

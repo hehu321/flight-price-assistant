@@ -80,9 +80,35 @@ export interface PriceWatch {
   destinationCity: string;
   destinationCityCode?: string;
   departureDate: string;
-  targetPrice: number;
+  /** Optional: monitoring can still alert on a meaningful price drop without a target. */
+  targetPrice?: number;
   enabledPlatforms: SupportedPlatform[];
+  /** Preserve the exact user-selected conditions for later background checks. */
+  query?: FlightQuery;
+  monitorEnabled?: boolean;
+  intervalMinutes?: number;
+  nextRunAt?: string;
+  lastRunAt?: string;
+  lastSuccessfulPrice?: number;
+  lastOutcome?: "scheduled" | "completed" | "partial" | "blocked" | "failed" | "deferred";
+  lastError?: string;
+  targetReached?: boolean;
+  lastNotifiedAt?: string;
+  lastNotifiedPrice?: number;
   createdAt: string;
   updatedAt: string;
   lastTriggeredAt?: string;
+}
+
+export type PriceWatchEventType = "target_reached" | "price_drop" | "blocked" | "failed";
+
+export interface PriceWatchEvent {
+  id: string;
+  watchId: string;
+  journeyKey: string;
+  type: PriceWatchEventType;
+  message: string;
+  price?: number;
+  platformCount?: number;
+  createdAt: string;
 }

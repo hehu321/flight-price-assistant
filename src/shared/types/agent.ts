@@ -26,7 +26,8 @@ export interface AgentRun {
   id: string;
   clientId: string;
   requestId: string;
-  source: "agent" | "manual";
+  source: "agent" | "manual" | "monitor";
+  monitorWatchId?: string;
   query: FlightQuery;
   timeoutSeconds: number;
   status: AgentRunStatus;

@@ -2,7 +2,7 @@ import { defineStore } from "pinia";
 import { PriceWatch, QuerySnapshot } from "@/shared/types/storage";
 import { clearAllPriceRecords } from "@/core/storage/price-record-repository";
 import { clearAllQuerySnapshots, getAllQuerySnapshots } from "@/core/storage/query-snapshot-repository";
-import { clearAllPriceWatches, deletePriceWatch, getAllPriceWatches, savePriceWatch } from "@/core/storage/price-watch-repository";
+import { clearAllPriceWatchEvents, clearAllPriceWatches, deletePriceWatch, getAllPriceWatches, savePriceWatch } from "@/core/storage/price-watch-repository";
 
 export const useHistoryStore = defineStore("history", {
   state: () => ({
@@ -32,7 +32,7 @@ export const useHistoryStore = defineStore("history", {
       this.watches = this.watches.filter((watch) => watch.id !== id);
     },
     async clearHistory() {
-      await Promise.all([clearAllQuerySnapshots(), clearAllPriceRecords(), clearAllPriceWatches()]);
+      await Promise.all([clearAllQuerySnapshots(), clearAllPriceRecords(), clearAllPriceWatches(), clearAllPriceWatchEvents()]);
       this.snapshots = [];
       this.watches = [];
     },

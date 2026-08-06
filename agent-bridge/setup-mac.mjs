@@ -5,6 +5,11 @@ import os from "node:os";
 import path from "node:path";
 import { extensionIdFromManifest, installMacBridge, projectRoot, tomlString } from "./install-common.mjs";
 
+if (process.platform !== "darwin") {
+  process.stderr.write("本地 AI Agent 接入当前仅支持 macOS；Windows 可使用插件与自动票价监控。\n");
+  process.exit(1);
+}
+
 const root = projectRoot();
 const args = new Set(process.argv.slice(2));
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";

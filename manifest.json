@@ -10,7 +10,10 @@
     "storage",
     "sidePanel",
     "webNavigation",
-    "nativeMessaging"
+    "nativeMessaging",
+    "alarms",
+    "idle",
+    "notifications"
   ],
   "host_permissions": [
     "https://*.ctrip.com/*",

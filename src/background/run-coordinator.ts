@@ -19,6 +19,7 @@ import { FlightQuery, FlightResult, SupportedPlatform } from "@/shared/types/fli
 import { ComparisonTask, PlatformTaskState } from "@/shared/types/platform";
 import { generateId } from "@/shared/utils/id-generator";
 import { taskManager } from "./task-manager";
+import { PriceWatch } from "@/shared/types/storage";
 
 const ALL_PLATFORMS: SupportedPlatform[] = ["ctrip", "qunar", "fliggy", "tongcheng"];
 const RUN_RETENTION_MS = 24 * 60 * 60 * 1000;
@@ -46,7 +47,8 @@ class RunCoordinator {
 
   async startManual(query: FlightQuery): Promise<ComparisonTask> {
     const run = await this.createRun({ id: "manual", name: "插件手动查询" }, query, generateId("manual"), "manual");
-    await this.enqueue(run);
+    await this.preemptMonitorForManualQuery();
+    await this.enqueue(run, true);
     return createComparisonTask(query, run.id);
   }
 
@@ -116,12 +118,14 @@ class RunCoordinator {
   async cancel(runId: string): Promise<void> {
     const run = await this.requireRun(runId);
     this.queue = this.queue.filter((id) => id !== runId);
-    if (this.activeRunId === runId) await taskManager.cancelComparison(runId);
     run.status = "cancelled";
     run.completedAt = new Date().toISOString();
     run.updatedAt = run.completedAt;
     run.version += 1;
     await saveAgentRun(run);
+    // Persist cancellation before task observers fire so scheduled-monitor
+    // cleanup never treats an interrupted task as a successful price sample.
+    if (this.activeRunId === runId) await taskManager.cancelComparison(runId);
     if (this.activeRunId === runId) {
       this.activeRunId = undefined;
       await this.dispatchNext();
@@ -131,6 +135,29 @@ class RunCoordinator {
   async getStatus(): Promise<{ activeRunId?: string; queueLength: number; queuedRunIds: string[] }> {
     await this.initialize();
     return { activeRunId: this.activeRunId, queueLength: this.queue.length, queuedRunIds: [...this.queue] };
+  }
+
+  async startMonitor(watch: PriceWatch): Promise<AgentRun | undefined> {
+    await this.initialize();
+    const query = watch.query || {
+      tripType: "oneway" as const, originCity: watch.originCity, originCityCode: watch.originCityCode,
+      destinationCity: watch.destinationCity, destinationCityCode: watch.destinationCityCode,
+      departureDate: watch.departureDate, adultCount: 1, childCount: 0, cabinClass: "economy" as const,
+      directOnly: false, enabledPlatforms: watch.enabledPlatforms,
+    };
+    const run = await this.createRun({ id: "monitor", name: "自动票价监控" }, query, `monitor-${watch.id}-${Date.now()}`, "monitor");
+    run.monitorWatchId = watch.id;
+    await saveAgentRun(run);
+    await this.enqueue(run);
+    return run;
+  }
+
+  async cancelActiveMonitor(): Promise<AgentRun | undefined> {
+    if (!this.activeRunId) return undefined;
+    const run = await getAgentRun(this.activeRunId);
+    if (!run || run.source !== "monitor") return undefined;
+    await this.cancel(run.id);
+    return run;
   }
 
   private async createRun(client: AgentClientIdentity, query: FlightQuery, requestId: string, source: AgentRun["source"], timeoutSeconds = 180): Promise<AgentRun> {
@@ -156,9 +183,9 @@ class RunCoordinator {
     return run;
   }
 
-  private async enqueue(run: AgentRun): Promise<void> {
+  private async enqueue(run: AgentRun, priority = false): Promise<void> {
     if (run.status === "cancelled" || run.status === "expired") return;
-    if (!this.queue.includes(run.id) && this.activeRunId !== run.id) this.queue.push(run.id);
+    if (!this.queue.includes(run.id) && this.activeRunId !== run.id) priority ? this.queue.unshift(run.id) : this.queue.push(run.id);
     await this.refreshQueuePositions();
     await this.dispatchNext();
   }
@@ -178,7 +205,7 @@ class RunCoordinator {
     run.version += 1;
     await saveAgentRun(run);
     await this.refreshQueuePositions();
-    await taskManager.startComparison(run.query, run.id, run.timeoutSeconds);
+    await taskManager.startComparison(run.query, run.id, run.timeoutSeconds, { monitoring: run.source === "monitor" });
   }
 
   private async onTaskUpdate(task: ComparisonTask, results: Record<SupportedPlatform, FlightResult[]>): Promise<void> {
@@ -224,6 +251,12 @@ class RunCoordinator {
     const run = await getAgentRun(runId);
     if (!run) throw structuredError("RUN_NOT_FOUND", "未找到该查询任务");
     return run;
+  }
+
+  private async preemptMonitorForManualQuery(): Promise<void> {
+    if (!this.activeRunId) return;
+    const active = await getAgentRun(this.activeRunId);
+    if (active?.source === "monitor") await this.cancel(active.id);
   }
 }
 

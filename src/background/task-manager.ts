@@ -36,10 +36,13 @@ class TaskManager {
   private observers = new Set<(task: ComparisonTask, results: Record<SupportedPlatform, FlightResult[]>) => void>();
   private cancelledTaskIds = new Set<string>();
   private taskTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+  private monitorTaskIds = new Set<string>();
 
-  async startComparison(query: FlightQuery, taskId?: string, timeoutSeconds = 180): Promise<ComparisonTask> {
+  async startComparison(query: FlightQuery, taskId?: string, timeoutSeconds = 180, options?: { monitoring?: boolean }): Promise<ComparisonTask> {
     const task = createComparisonTask(query, taskId);
     this.cancelledTaskIds.delete(task.id);
+    if (options?.monitoring) this.monitorTaskIds.add(task.id);
+    else this.monitorTaskIds.delete(task.id);
     this.activeTask = task;
     this.collectedResults.set(task.id, new Map());
     await saveCurrentTask(task);
@@ -124,6 +127,7 @@ class TaskManager {
     }
     this.broadcastTaskState(taskId, platform, currentPlatformState);
     this.notifyObservers();
+    if (this.monitorTaskIds.has(taskId) && isTaskTerminalStatus(status)) void this.closeCompletedPlatformTab(taskId, platform);
   }
 
   async savePlatformResults(taskId: string, platform: SupportedPlatform, results: FlightResult[]) {
@@ -303,6 +307,7 @@ class TaskManager {
     }
     await saveCurrentTask(this.activeTask);
     await saveQuerySnapshot(this.toQuerySnapshot(taskId));
+    if (this.monitorTaskIds.has(taskId)) await this.closeTaskPlatformTabs(taskId);
   }
 
   subscribe(observer: (task: ComparisonTask, results: Record<SupportedPlatform, FlightResult[]>) => void): () => void {
@@ -468,12 +473,20 @@ class TaskManager {
   }
 
   private async closeCompletedPlatformTab(taskId: string, platform: SupportedPlatform): Promise<void> {
-    if (await this.shouldKeepPlatformTabs()) return;
+    if (!this.monitorTaskIds.has(taskId) && await this.shouldKeepPlatformTabs()) return;
     const binding = tabManager.getTabBinding(taskId, platform);
     if (!binding) return;
     if (this.isBookingNavigation(binding.tabId)) return;
     await tabManager.closeTab(binding.tabId);
     logger.info(`采集完成后自动关闭${platformName(platform)}平台标签页: ${binding.tabId}`);
+  }
+
+  private async closeTaskPlatformTabs(taskId: string): Promise<void> {
+    const platforms: SupportedPlatform[] = ["ctrip", "qunar", "fliggy", "tongcheng"];
+    await Promise.all(platforms.map(async (platform) => {
+      const binding = tabManager.getTabBinding(taskId, platform);
+      if (binding && !this.isBookingNavigation(binding.tabId)) await tabManager.closeTab(binding.tabId);
+    }));
   }
 
   private async shouldKeepPlatformTabs(): Promise<boolean> {
