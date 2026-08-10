@@ -18,7 +18,7 @@
       </div>
 
       <div class="setting-item">
-        <div><strong>保留平台标签页</strong><small>采集完成后保留结果页，便于手动复核</small></div>
+        <div><strong>保留平台结果页</strong><small>默认在采集完成后自动关闭；开启后保留页面，便于手动复核</small></div>
         <a-switch :checked="settingsStore.keepTabs" @change="settingsStore.toggleKeepTabs" />
       </div>
     </div>

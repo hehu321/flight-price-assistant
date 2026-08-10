@@ -3,6 +3,8 @@ export type SupportedPlatform = "ctrip" | "qunar" | "fliggy" | "tongcheng";
 export type CabinClass = "economy" | "premium_economy" | "business" | "first";
 
 export type TripType = "oneway" | "roundtrip";
+export type FlightLeg = "outbound" | "inbound";
+export type RoundTripPricingMode = "native_package" | "split_fallback";
 
 export interface FlightQuery {
   tripType: TripType;
@@ -45,6 +47,10 @@ export type PriceDisclosure = "base_only" | "total_only" | "breakdown";
 export interface FlightResult {
   id: string;
   platform: SupportedPlatform;
+  /** Present for a round-trip query so the two directions can never mix. */
+  leg?: FlightLeg;
+  /** A split fallback is not a platform round-trip package price. */
+  roundTripPricingMode?: RoundTripPricingMode;
 
   marketingFlightNumber: string;
   operatingFlightNumber?: string;
@@ -92,6 +98,36 @@ export interface FlightResult {
   collectedAt: string;
   sourceUrl: string;
 
+  rawPriceText: string;
+  warnings: string[];
+}
+
+/** A platform-disclosed round-trip option.  This is deliberately separate
+ * from FlightResult so two one-way fares can never be presented as a package. */
+export interface RoundTripFlightSegment {
+  marketingFlightNumber: string;
+  airline: string;
+  departureDate: string;
+  departureTime: string;
+  arrivalTime: string;
+  departureAirport: string;
+  arrivalAirport: string;
+  direct: boolean;
+  stopInfo?: string;
+}
+
+export interface RoundTripPackageResult {
+  id: string;
+  platform: SupportedPlatform;
+  outbound: RoundTripFlightSegment;
+  inbound: RoundTripFlightSegment;
+  /** Price explicitly labelled by the platform as the round-trip total. */
+  displayedTotalPrice: number;
+  isStartingPrice: boolean;
+  currency: "CNY";
+  confidence: number;
+  collectedAt: string;
+  sourceUrl: string;
   rawPriceText: string;
   warnings: string[];
 }

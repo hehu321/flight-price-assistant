@@ -15,6 +15,8 @@ export async function validateCtripContext(query: FlightQuery): Promise<SearchCo
   const hasOrigin = urlUpper.includes(query.originCityCode || "WUH") || document.body.innerText.includes(originNorm);
   const hasDest = urlUpper.includes(query.destinationCityCode || "BJS") || document.body.innerText.includes(destNorm);
   const hasDate = url.includes(query.departureDate) || document.body.innerText.includes(query.departureDate);
+  const hasReturnDate = query.tripType !== "roundtrip" || !query.returnDate
+    || url.includes(query.returnDate) || document.body.innerText.includes(query.returnDate);
 
   if (hasOrigin) matchedFields.push("origin");
   else mismatchedFields.push({ field: "origin", expected: query.originCity, actual: "未检测到" });
@@ -24,6 +26,11 @@ export async function validateCtripContext(query: FlightQuery): Promise<SearchCo
 
   if (hasDate) matchedFields.push("departureDate");
   else mismatchedFields.push({ field: "departureDate", expected: query.departureDate, actual: "未检测到" });
+
+  if (query.tripType === "roundtrip" && query.returnDate) {
+    if (hasReturnDate) matchedFields.push("returnDate");
+    else mismatchedFields.push({ field: "returnDate", expected: query.returnDate, actual: "未检测到" });
+  }
 
   const valid = mismatchedFields.length === 0;
 

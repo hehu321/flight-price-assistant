@@ -12,6 +12,10 @@ export function buildCtripSearchUrl(query: FlightQuery): string | null {
     return `http://localhost:3001/search.html?from=${originCode.toUpperCase()}&to=${destCode.toUpperCase()}&date=${query.departureDate}`;
   }
 
+  if (query.tripType === "roundtrip" && query.returnDate) {
+    return `https://flights.ctrip.com/online/list/round-${originCode}-${destCode}?depdate=${query.departureDate}_${query.returnDate}&cabin=y_s_c_f&adult=${query.adultCount}&child=${query.childCount || 0}&infant=0`;
+  }
+
   // 携程公开 UR L模式
   return `https://flights.ctrip.com/online/list/oneway-${originCode}-${destCode}?depdate=${query.departureDate}`;
 }

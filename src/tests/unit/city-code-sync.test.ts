@@ -30,4 +30,11 @@ describe("城市名称与缓存代码同步", () => {
     expect(fliggy.searchParams.get("arrCity")).toBe("KMG");
     expect(fliggy.searchParams.get("arrCityName")).toBe("昆明");
   });
+
+  it("携程往返使用平台原生 round 地址并同时携带两个日期", () => {
+    const roundtrip: FlightQuery = { ...staleCodeQuery, tripType: "roundtrip", returnDate: "2026-08-12" };
+    const url = buildCtripSearchUrl(roundtrip)!;
+    expect(url).toContain("round-wuh-kmg");
+    expect(url).toContain("depdate=2026-08-08_2026-08-12");
+  });
 });

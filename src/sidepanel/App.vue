@@ -23,7 +23,7 @@ import { useTaskStore } from "./stores/task";
 import { useResultsStore } from "./stores/results";
 import { useSettingsStore } from "./stores/settings";
 import { ExtensionMessage, TaskStateChangedPayload } from "@/shared/types/message";
-import { FlightResult, SupportedPlatform } from "@/shared/types/flight";
+import { FlightResult, RoundTripPackageResult, SupportedPlatform } from "@/shared/types/flight";
 
 const taskStore = useTaskStore();
 const resultsStore = useResultsStore();
@@ -41,6 +41,7 @@ function handleRuntimeMessage(message: ExtensionMessage) {
   if (payload.results) {
     resultsStore.addPlatformResults(payload.platform, payload.results);
   }
+  if (payload.packages) resultsStore.addPlatformPackages(payload.platform, payload.packages);
 }
 
 onMounted(() => {
@@ -52,6 +53,8 @@ onMounted(() => {
       taskStore.setTask(response.task);
       const persistedResults = response.results as Record<SupportedPlatform, FlightResult[]> | undefined;
       resultsStore.setResults(persistedResults ? Object.values(persistedResults).flat() : []);
+      const persistedPackages = Object.values(response.task.roundTripPackages || {}).flat() as RoundTripPackageResult[];
+      resultsStore.setRoundTripPackages(persistedPackages);
     });
   }
 });

@@ -37,27 +37,39 @@ export function handleMessage(
     }
 
     case "ADAPTER_COMPLETED": {
-      const { taskId, platform, results } = message.payload as any;
-      taskManager.savePlatformResults(taskId, platform, results).then(() => sendResponse({ success: true }));
+      const { taskId, platform, results, leg } = message.payload as any;
+      taskManager.savePlatformResults(taskId, platform, results, leg).then(() => sendResponse({ success: true }));
       return true;
     }
 
     case "ADAPTER_PROGRESS": {
-      const { taskId, platform, results, message: progressMessage } = message.payload as any;
-      taskManager.savePlatformProgress(taskId, platform, results, progressMessage).then(() => sendResponse({ success: true }));
+      const { taskId, platform, results, message: progressMessage, leg } = message.payload as any;
+      taskManager.savePlatformProgress(taskId, platform, results, progressMessage, leg).then(() => sendResponse({ success: true }));
+      return true;
+    }
+
+    case "ADAPTER_PACKAGE_PROGRESS": {
+      const { taskId, platform, packages, message: progressMessage } = message.payload as any;
+      taskManager.savePlatformPackages(taskId, platform, packages, progressMessage, false).then(() => sendResponse({ success: true }));
+      return true;
+    }
+
+    case "ADAPTER_PACKAGE_COMPLETED": {
+      const { taskId, platform, packages } = message.payload as any;
+      taskManager.savePlatformPackages(taskId, platform, packages, `携程往返套餐提取完成，获得${packages.length}个套餐`, true).then(() => sendResponse({ success: true }));
       return true;
     }
 
     case "ADAPTER_FAILED": {
-      const { taskId, platform, error } = message.payload as any;
-      taskManager.failPlatform(taskId, platform, error);
+      const { taskId, platform, error, leg } = message.payload as any;
+      taskManager.failPlatform(taskId, platform, error, leg);
       sendResponse({ success: true });
       return false;
     }
 
     case "ADAPTER_EMPTY": {
-      const { taskId, platform, message: emptyMessage } = message.payload as any;
-      taskManager.markPlatformEmpty(taskId, platform, emptyMessage);
+      const { taskId, platform, message: emptyMessage, leg } = message.payload as any;
+      taskManager.markPlatformEmpty(taskId, platform, emptyMessage, leg);
       sendResponse({ success: true });
       return false;
     }

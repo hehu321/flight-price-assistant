@@ -35,7 +35,8 @@ export function initNavigationListener(): void {
             details.tabId,
             binding.taskId,
             binding.platform,
-            task.query
+            taskManager.getLegQuery(binding.taskId, binding.leg) || task.query,
+            binding.leg
           );
         }
       }

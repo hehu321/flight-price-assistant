@@ -1,12 +1,21 @@
 import { adapterRegistry } from "@/adapters/base/adapter-registry";
 import { registerAllAdapters } from "@/adapters";
-import { sendToBackground } from "./page-bridge";
+import { sendToBackground as sendToBackgroundBase } from "./page-bridge";
 import { logger } from "@/shared/logger/logger";
-import { FlightQuery, FlightResult } from "@/shared/types/flight";
+import { FlightLeg, FlightQuery, FlightResult } from "@/shared/types/flight";
+import { ExtensionMessage } from "@/shared/types/message";
+import { collectCtripRoundTripPackages, isCtripNativeRoundTripPage } from "@/adapters/ctrip/ctrip-roundtrip-collector";
 
 registerAllAdapters();
+let activeLeg: FlightLeg | undefined;
 
-export async function runAdapterOnCurrentPage(taskId?: string, query?: FlightQuery): Promise<void> {
+function sendToBackground<T extends Record<string, unknown>>(message: ExtensionMessage<T>): Promise<unknown> {
+  if (!activeLeg || !message.payload) return sendToBackgroundBase(message);
+  return sendToBackgroundBase({ ...message, payload: { ...message.payload, leg: activeLeg } as T });
+}
+
+export async function runAdapterOnCurrentPage(taskId?: string, query?: FlightQuery, leg?: FlightLeg): Promise<void> {
+  activeLeg = leg;
   const url = window.location.href;
   const adapter = adapterRegistry.findAdapterForUrl(url);
 
@@ -40,6 +49,25 @@ export async function runAdapterOnCurrentPage(taskId?: string, query?: FlightQue
     return;
   }
 
+  // Ctrip's native round-trip screen is a stateful picker. Its return-side
+  // price is explicitly labelled as a package total, so keep it out of the
+  // normal one-way extraction pipeline.
+  if (adapter.id === "ctrip" && query && isCtripNativeRoundTripPage(query)) {
+    try {
+      const validation = await adapter.validateSearchContext(query);
+      if (!validation.valid) throw new Error("ROUNDTRIP_CONTEXT_MISMATCH");
+      const packages = await collectCtripRoundTripPackages(query, async (current, message) => {
+        await sendToBackground({ type: "ADAPTER_PACKAGE_PROGRESS", taskId, platform: "ctrip", payload: { taskId, platform: "ctrip", packages: current, message } });
+      });
+      if (!packages.length) throw new Error("ROUNDTRIP_PACKAGE_EMPTY");
+      await sendToBackground({ type: "ADAPTER_PACKAGE_COMPLETED", taskId, platform: "ctrip", payload: { taskId, platform: "ctrip", packages } });
+    } catch (error) {
+      logger.error("携程往返套餐采集失败:", error);
+      await sendToBackground({ type: "ADAPTER_FAILED", taskId, platform: "ctrip", payload: { taskId, platform: "ctrip", error: { code: error instanceof Error ? error.message : "ROUNDTRIP_PACKAGE_FAILED", message: "携程往返套餐暂未读取到，可点击重新提取；去程和返程分段结果仍可参考", retryable: true } } });
+    }
+    return;
+  }
+
   // 携程等慢页面可在卡片陆续出现时直接上报，不等整页加载完成。
   if (adapter.collectIncrementally) {
     try {
@@ -64,7 +92,7 @@ export async function runAdapterOnCurrentPage(taskId?: string, query?: FlightQue
           payload: { taskId, platform: adapter.id, results, message },
         });
       });
-      const validResults = rawResults.map((result) => result.parsedResult!).filter(Boolean);
+      const validResults = rawResults.map((result) => result.parsedResult!).filter(Boolean).map((result) => leg ? { ...result, leg, roundTripPricingMode: "split_fallback" as const } : result);
       if (validResults.length === 0) {
         if (hasExplicitEmptyState()) {
           sendToBackground({ type: "ADAPTER_EMPTY", taskId, platform: adapter.id, payload: { taskId, platform: adapter.id, message: "该平台明确显示暂无符合条件的航班" } });
@@ -151,7 +179,8 @@ export async function runAdapterOnCurrentPage(taskId?: string, query?: FlightQue
   const rawResults = await adapter.extractFlights();
   const validResults = rawResults
     .map((r) => r.parsedResult!)
-    .filter(Boolean);
+    .filter(Boolean)
+    .map((result) => leg ? { ...result, leg, roundTripPricingMode: "split_fallback" as const } : result);
 
   if (validResults.length === 0) {
     if (hasExplicitEmptyState()) {
