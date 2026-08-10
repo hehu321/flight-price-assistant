@@ -1,7 +1,7 @@
 import { runAdapterOnCurrentPage } from "./adapter-runner";
 import { logger } from "@/shared/logger/logger";
 import { ExtensionMessage } from "@/shared/types/message";
-import { FlightQuery, FlightResult } from "@/shared/types/flight";
+import { FlightLeg, FlightQuery, FlightResult } from "@/shared/types/flight";
 import { adapterRegistry } from "@/adapters/base/adapter-registry";
 import { BookingActionResult } from "@/shared/types/message";
 
@@ -23,21 +23,23 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendRe
   // Acknowledge immediately.  The background retries only when no listener is
   // present; without this response Chrome reports a closed message port and
   // starts duplicate extraction runs.
-  if (activeTaskIds.has(message.taskId)) {
+  const leg = (message.payload as { leg?: FlightLeg } | undefined)?.leg;
+  const executionKey = `${message.taskId}:${leg || "default"}`;
+  if (activeTaskIds.has(executionKey)) {
     sendResponse({ accepted: true, duplicate: true });
     return;
   }
-  activeTaskIds.add(message.taskId);
+  activeTaskIds.add(executionKey);
   sendResponse({ accepted: true });
 
   const run = async () => {
     const query = (message.payload as { query?: FlightQuery } | undefined)?.query;
     try {
-      await runAdapterOnCurrentPage(message.taskId, query);
+      await runAdapterOnCurrentPage(message.taskId, query, leg);
     } catch (error) {
       logger.error("执行页面适配器失败:", error);
     } finally {
-      activeTaskIds.delete(message.taskId!);
+      activeTaskIds.delete(executionKey);
     }
   };
 

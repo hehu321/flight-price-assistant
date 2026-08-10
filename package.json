@@ -1,11 +1,13 @@
 {
   "name": "flight-price-assistant",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "机票多平台比价与价格趋势分析 Chrome 浏览器插件",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc && vite build",
+    "package:release": "node scripts/package-extension.mjs",
+    "package:crx": "node scripts/package-crx.mjs",
     "typecheck": "vue-tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write \"src/**/*.{ts,vue,css,html}\"",
@@ -33,11 +35,14 @@
   },
   "devDependencies": {
     "@crxjs/vite-plugin": "^2.0.0-beta.23",
+    "@types/archiver": "^8.0.0",
     "@types/chrome": "^0.0.260",
     "@types/node": "^20.11.16",
+    "@types/yauzl": "^3.4.0",
     "@typescript-eslint/eslint-plugin": "^6.20.0",
     "@typescript-eslint/parser": "^6.20.0",
     "@vitejs/plugin-vue": "^5.0.3",
+    "archiver": "^8.0.0",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-vue": "^9.21.1",
@@ -46,6 +51,7 @@
     "typescript": "^5.3.3",
     "vite": "^5.0.12",
     "vitest": "^1.2.2",
-    "vue-tsc": "^3.3.8"
+    "vue-tsc": "^3.3.8",
+    "yauzl": "^3.4.0"
   }
 }

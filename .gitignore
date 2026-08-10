@@ -1,6 +1,7 @@
 # Dependencies and generated extension bundles
 node_modules/
 dist/
+release/
 coverage/
 
 # Local diagnostics, browser artifacts, and development logs
@@ -13,6 +14,9 @@ coverage/
 .env.*
 !.env.example
 *.local
+.keys/
+*.pem
+*.crx
 
 # Editor and operating-system metadata
 .DS_Store

@@ -3,6 +3,8 @@ import { cleanOldPriceRecords } from "@/core/storage/price-record-repository";
 import { cleanOldQuerySnapshots } from "@/core/storage/query-snapshot-repository";
 
 const KEEP_PLATFORM_TABS_KEY = "keep_platform_tabs";
+const KEEP_PLATFORM_TABS_PREFERENCE_VERSION_KEY = "keep_platform_tabs_preference_version";
+const KEEP_PLATFORM_TABS_PREFERENCE_VERSION = 2;
 const THEME_KEY = "sidepanel_theme";
 const HISTORY_RETENTION_DAYS_KEY = "history_retention_days";
 
@@ -25,8 +27,9 @@ export const useSettingsStore = defineStore("settings", {
     },
     async loadPreferences() {
       if (typeof chrome === "undefined" || !chrome.storage?.local) return;
-      const value = await chrome.storage.local.get([KEEP_PLATFORM_TABS_KEY, THEME_KEY, HISTORY_RETENTION_DAYS_KEY]);
-      if (typeof value[KEEP_PLATFORM_TABS_KEY] === "boolean") this.keepTabs = value[KEEP_PLATFORM_TABS_KEY];
+      const value = await chrome.storage.local.get([KEEP_PLATFORM_TABS_KEY, KEEP_PLATFORM_TABS_PREFERENCE_VERSION_KEY, THEME_KEY, HISTORY_RETENTION_DAYS_KEY]);
+      if (value[KEEP_PLATFORM_TABS_PREFERENCE_VERSION_KEY] === KEEP_PLATFORM_TABS_PREFERENCE_VERSION && typeof value[KEEP_PLATFORM_TABS_KEY] === "boolean") this.keepTabs = value[KEEP_PLATFORM_TABS_KEY];
+      else await chrome.storage.local.set({ [KEEP_PLATFORM_TABS_KEY]: false, [KEEP_PLATFORM_TABS_PREFERENCE_VERSION_KEY]: KEEP_PLATFORM_TABS_PREFERENCE_VERSION });
       if (value[THEME_KEY] === "dark" || value[THEME_KEY] === "light") this.theme = value[THEME_KEY];
       if ([7, 30, 90].includes(value[HISTORY_RETENTION_DAYS_KEY])) this.retentionDays = value[HISTORY_RETENTION_DAYS_KEY];
       document.documentElement.setAttribute("data-theme", this.theme);
@@ -34,7 +37,7 @@ export const useSettingsStore = defineStore("settings", {
     async toggleKeepTabs(value?: boolean | string | number) {
       this.keepTabs = typeof value === "boolean" ? value : !this.keepTabs;
       if (typeof chrome !== "undefined" && chrome.storage?.local) {
-        await chrome.storage.local.set({ [KEEP_PLATFORM_TABS_KEY]: this.keepTabs });
+        await chrome.storage.local.set({ [KEEP_PLATFORM_TABS_KEY]: this.keepTabs, [KEEP_PLATFORM_TABS_PREFERENCE_VERSION_KEY]: KEEP_PLATFORM_TABS_PREFERENCE_VERSION });
       }
     },
     async setRetentionDays(value?: unknown) {

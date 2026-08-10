@@ -1,8 +1,9 @@
 import { PlatformTabBinding, SupportedPlatform } from "@/shared/types/platform";
+import { FlightLeg } from "@/shared/types/flight";
 import { logger } from "@/shared/logger/logger";
 
 class TabManager {
-  private bindings: Map<string, PlatformTabBinding> = new Map(); // key: taskId_platform
+  private bindings: Map<string, PlatformTabBinding & { leg?: FlightLeg }> = new Map(); // key: taskId_platform_leg
 
   constructor() {
     if (typeof chrome !== "undefined" && chrome.tabs) {
@@ -14,9 +15,9 @@ class TabManager {
     taskId: string,
     platform: SupportedPlatform,
     url: string,
-    options: { active?: boolean } = {}
+    options: { active?: boolean; leg?: FlightLeg } = {}
   ): Promise<number> {
-    const key = `${taskId}_${platform}`;
+    const key = `${taskId}_${platform}_${options.leg || "default"}`;
     const existing = this.bindings.get(key);
     if (existing) {
       try {
@@ -33,18 +34,18 @@ class TabManager {
     if (typeof chrome !== "undefined" && chrome.tabs) {
       const tab = await chrome.tabs.create({ url, active: options.active ?? false });
       const tabId = tab.id!;
-      this.bindings.set(key, { taskId, platform, tabId, createdAt: new Date().toISOString() });
+      this.bindings.set(key, { taskId, platform, tabId, leg: options.leg, createdAt: new Date().toISOString() });
       return tabId;
     } else {
       // Mock 环境 fallback
       const mockTabId = Math.floor(Math.random() * 10000);
-      this.bindings.set(key, { taskId, platform, tabId: mockTabId, createdAt: new Date().toISOString() });
+      this.bindings.set(key, { taskId, platform, tabId: mockTabId, leg: options.leg, createdAt: new Date().toISOString() });
       return mockTabId;
     }
   }
 
-  getTabBinding(taskId: string, platform: SupportedPlatform): PlatformTabBinding | undefined {
-    return this.bindings.get(`${taskId}_${platform}`);
+  getTabBinding(taskId: string, platform: SupportedPlatform, leg?: FlightLeg): PlatformTabBinding | undefined {
+    return this.bindings.get(`${taskId}_${platform}_${leg || "default"}`);
   }
 
   getBindingByTabId(tabId: number): PlatformTabBinding | undefined {
@@ -52,6 +53,11 @@ class TabManager {
       if (binding.tabId === tabId) return binding;
     }
     return undefined;
+  }
+
+  /** Return every temporary result page owned by a task, including both legs. */
+  getTaskBindings(taskId: string): PlatformTabBinding[] {
+    return [...this.bindings.values()].filter((binding) => binding.taskId === taskId);
   }
 
   async closeTab(tabId: number): Promise<void> {

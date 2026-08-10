@@ -1,4 +1,4 @@
-import { FlightQuery, SupportedPlatform } from "./flight";
+import { FlightLeg, FlightQuery, RoundTripPackageResult, SupportedPlatform } from "./flight";
 
 export type { SupportedPlatform };
 
@@ -60,11 +60,14 @@ export interface ComparisonTask {
   updatedAt: string;
 
   platforms: Record<SupportedPlatform, PlatformTaskState>;
+  /** Native packages only; split one-way results remain in the normal store. */
+  roundTripPackages?: Partial<Record<SupportedPlatform, RoundTripPackageResult[]>>;
 }
 
 export interface PlatformTabBinding {
   taskId: string;
   platform: SupportedPlatform;
+  leg?: FlightLeg;
   tabId: number;
   createdAt: string;
 }

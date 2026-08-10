@@ -19,6 +19,7 @@
 - `sidePanel`: 在 Chrome 侧边栏提供统一用户界面。
 - `webNavigation`: 监听平台页面跳转与动态加载状态。
 - `nativeMessaging`: 仅在用户安装本地 AI Agent 桥接程序后，与本机 MCP 服务安全通信；不开放网页接口。
+- `alarms`、`idle`、`notifications`: 用户开启的本地票价监控、空闲调度和系统提醒；不会绕过登录、验证码或访问限制。
 
 ## 开发与构建
 
@@ -40,11 +41,42 @@ npm run test
 
 # 项目构建
 npm run build
+
+# 一键生成可上传 Chrome Web Store 的发行 ZIP
+npm run package:release
 ```
 
-## AI Agent 本地接入（macOS）
+发行包会输出到 `release/flight-price-assistant-v<版本号>.zip`。ZIP 内的 `manifest.json` 位于根目录，可直接上传到 Chrome Web Store Developer Dashboard；`release/` 目录是构建产物，不应提交到 Git。
+
+## 跨平台插件与自动票价监控（macOS / Windows）
+
+插件本体、历史记录、系统通知与自动票价监控同时支持 macOS 和 Windows 的 Google Chrome。用户可在“历史 → 关注中”中开启自动监控：Chrome 空闲至少 10 分钟后，插件每 6 小时重新比价一次；达到可选目标价或已核验含税最低价较上次下降至少 ¥50 时，会写入本地历史并发送系统通知。
+
+设备休眠、Chrome 关闭、未登录、验证码、短信验证、限流或页面变化期间不会强行运行；浏览器恢复后会在下一次空闲检查时继续。定时查询只访问用户在关注项中选中的平台，完成后自动关闭这些查询标签页。
+
+### 生成签名 CRX（企业/受控分发）
+
+Chrome Web Store 首次发布使用 ZIP，不需要自行生成 CRX；商店会自动生成分发包。只有企业内部分发、受控安装，或启用了 Chrome Web Store 的 Verified CRX Uploads 时才需要 CRX。
+
+将**与 `manifest.json` 中 `key` 匹配的原始私钥**保存到未提交的 `.keys/flight-price-assistant.pem`，然后执行：
+
+```bash
+npm run package:crx
+```
+
+也可通过环境变量指定密钥路径：
+
+```bash
+FLIGHT_EXTENSION_KEY_PATH=/安全位置/flight-price-assistant.pem npm run package:crx
+```
+
+脚本会验证私钥与固定公钥是否匹配，确保不会意外生成新的扩展 ID。生成的 CRX 位于 `release/` 目录；绝不能将 `.pem` 私钥提交到 Git 或上传到 Chrome Web Store。
+
+## AI Agent 本地接入（仅 macOS）
 
 插件可通过本机 MCP 服务供 Codex、WorkBuddy 等支持 stdio MCP 的 Agent 调用。该能力只在本机运行，不提供网络 HTTP API，也不会传出 Cookie、登录信息或订票 Token。
+
+Windows 当前不支持 Native Messaging / 本地 MCP 桥接；Windows 用户仍可使用上面的插件与自动票价监控功能。
 
 开发环境只需执行一次：
 

@@ -33,6 +33,7 @@ export const ctripSelectors = {
   ],
 
   flightCard: [
+    ".flight-box",
     '[data-testid^="flight-item-"]',
     ".flight-item.domestic",
     ".ctrip-flight-card",

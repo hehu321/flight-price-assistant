@@ -22,6 +22,7 @@ export function extensionIdFromManifest() {
 }
 
 export function installMacBridge(extensionId = extensionIdFromManifest()) {
+  if (process.platform !== "darwin") throw new Error("本地 AI Agent 接入当前仅支持 macOS；Windows 可使用插件与自动票价监控。");
   if (!/^[a-p]{32}$/.test(extensionId)) throw new Error("Chrome 扩展 ID 格式不正确");
   const root = projectRoot();
   const host = path.join(root, "agent-bridge", "native-host.mjs");

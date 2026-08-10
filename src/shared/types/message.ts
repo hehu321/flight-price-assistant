@@ -1,4 +1,4 @@
-import { FlightQuery, FlightResult, SupportedPlatform } from "./flight";
+import { FlightLeg, FlightQuery, FlightResult, RoundTripPackageResult, SupportedPlatform } from "./flight";
 import { PlatformTaskState, PlatformTaskStatus, BlockingState, SearchContextValidation, AdapterDiagnosticReport } from "./platform";
 
 export type MessageType =
@@ -13,6 +13,8 @@ export type MessageType =
   | "EXECUTE_ADAPTER"
   | "ADAPTER_COMPLETED"
   | "ADAPTER_PROGRESS"
+  | "ADAPTER_PACKAGE_PROGRESS"
+  | "ADAPTER_PACKAGE_COMPLETED"
   | "ADAPTER_FAILED"
   | "ADAPTER_EMPTY"
   | "BLOCKING_DETECTED"
@@ -38,6 +40,14 @@ export interface TaskStateChangedPayload {
   platform: SupportedPlatform;
   state: PlatformTaskState;
   results?: FlightResult[];
+  packages?: RoundTripPackageResult[];
+}
+
+export interface AdapterPackageProgressPayload {
+  taskId: string;
+  platform: SupportedPlatform;
+  packages: RoundTripPackageResult[];
+  message: string;
 }
 
 export interface AdapterCompletedPayload {
@@ -45,6 +55,7 @@ export interface AdapterCompletedPayload {
   platform: SupportedPlatform;
   results: FlightResult[];
   validation: SearchContextValidation;
+  leg?: FlightLeg;
 }
 
 export interface AdapterProgressPayload {
@@ -52,6 +63,7 @@ export interface AdapterProgressPayload {
   platform: SupportedPlatform;
   results: FlightResult[];
   message: string;
+  leg?: FlightLeg;
 }
 
 export interface AdapterFailedPayload {

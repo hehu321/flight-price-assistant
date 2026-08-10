@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 import { extensionIdFromManifest, installMacBridge } from "./install-common.mjs";
 
+if (process.platform !== "darwin") {
+  process.stderr.write("本地 AI Agent 接入当前仅支持 macOS；Windows 可使用插件与自动票价监控。\n");
+  process.exit(1);
+}
+
 const args = process.argv.slice(2);
 const extensionIdIndex = args.indexOf("--extension-id");
 const extensionId = extensionIdIndex >= 0 ? args[extensionIdIndex + 1] : undefined;

@@ -1,11 +1,11 @@
 <template>
   <div class="page-container fade-enter-active">
     <header class="page-header">
-      <div><h2>四平台统一比价结果</h2><p v-if="groups.length" class="result-summary">共 {{ groups.length }} 个航班 · 直飞 {{ directCount }} 个 · <b v-if="lowestComparablePrice !== null">已核验最低含税 ¥{{ lowestComparablePrice }}</b><b v-else>暂无已核验含税价</b></p></div>
-      <a-tag color="blue">已显示 {{ renderedGroups.length }} / {{ groups.length }}</a-tag>
+      <div><h2>{{ isRoundTrip ? '往返机票比价结果' : '四平台统一比价结果' }}</h2><p v-if="isRoundTrip" class="result-summary">{{ roundTripSummary }}</p><p v-else-if="groups.length" class="result-summary">共 {{ groups.length }} 个航班 · 直飞 {{ directCount }} 个 · <b v-if="lowestComparablePrice !== null">已核验最低含税 ¥{{ lowestComparablePrice }}</b><b v-else>暂无已核验含税价</b></p></div>
+      <a-tag color="blue">已显示 {{ activeRoundTripTab === 'package' ? packageRawResults.length : renderedGroups.length }} / {{ activeRoundTripTab === 'package' ? packageRawResults.length : groups.length }}</a-tag>
     </header>
 
-    <section class="quick-filters" aria-label="快捷筛选">
+    <section v-if="activeRoundTripTab !== 'package'" class="quick-filters" aria-label="快捷筛选">
       <a-button :type="filters.direct === 'direct' ? 'primary' : 'default'" @click="filters.direct = filters.direct === 'direct' ? 'all' : 'direct'">仅直飞</a-button>
       <a-select v-model:value="filters.airlines" mode="multiple" allow-clear :options="airlineOptions" placeholder="航空公司" class="quick-airline" />
       <a-select v-model:value="filters.departurePeriod" :options="periodOptions" class="quick-select" />
@@ -13,14 +13,21 @@
       <a-select v-model:value="filters.sort" :options="sortOptions" class="quick-sort" />
       <a-button class="more-filter-button" @click="drawerOpen = true">更多筛选<span v-if="activeFilterCount">（{{ activeFilterCount }}）</span></a-button>
     </section>
-    <div v-if="activeFilterCount" class="filter-tags"><a-tag v-for="tag in activeTags" :key="tag.key" closable @close.prevent="tag.clear">{{ tag.label }}</a-tag><a-button type="link" size="small" @click="resetFilters">清空全部</a-button></div>
+    <div v-if="activeRoundTripTab !== 'package' && activeFilterCount" class="filter-tags"><a-tag v-for="tag in activeTags" :key="tag.key" closable @close.prevent="tag.clear">{{ tag.label }}</a-tag><a-button type="link" size="small" @click="resetFilters">清空全部</a-button></div>
 
-    <div v-if="resultsStore.rawResults.length" class="data-quality"><span>报价状态</span><b>{{ verifiedOfferCount }}/{{ resultsStore.rawResults.length }}</b><span>条已核验含税价</span><em v-if="unverifiedOfferCount">其余为票面价，附加费待平台确认</em></div>
+    <div v-if="activeRoundTripTab !== 'package' && activeRawResults.length" class="data-quality"><span>报价状态</span><b>{{ verifiedOfferCount }}/{{ activeRawResults.length }}</b><span>条已核验含税价</span><em v-if="unverifiedOfferCount">其余为票面价，附加费待平台确认</em></div>
     <a-alert v-if="bookingNotice" class="booking-notice" :type="bookingNotice.type" show-icon :message="bookingNotice.message" closable @close="bookingNotice = undefined" />
     <SearchProgressPanel v-if="taskStore.currentTask" :task="taskStore.currentTask" @retry="retryPlatform" @login="openPlatformLogin" />
 
-    <section v-if="renderedGroups.length" class="results-list"><FlightGroupCard v-for="group in renderedGroups" :key="group.id" :group="group" :platforms="filters.platforms" @open-booking="openBooking" /><a-button v-if="renderedGroups.length < groups.length" block @click="filters.visibleLimit += 40">加载更多（剩余 {{ groups.length - renderedGroups.length }} 条）</a-button></section>
-    <div v-else class="empty-state"><p>{{ resultsStore.rawResults.length ? '没有符合当前筛选条件的航班。' : '暂无比价数据，请在“查询”页面发起一键比价。' }}</p><a-button v-if="resultsStore.rawResults.length" @click="resetFilters">清空筛选</a-button></div>
+    <a-tabs v-if="isRoundTrip" v-model:active-key="activeRoundTripTab" class="roundtrip-tabs" aria-label="往返结果切换">
+      <a-tab-pane key="outbound"><template #tab>去程（{{ outboundGroupCount }}）</template></a-tab-pane>
+      <a-tab-pane key="inbound"><template #tab>返程（{{ inboundGroupCount }}）</template></a-tab-pane>
+      <a-tab-pane key="package"><template #tab>往返套餐（{{ packageGroupCount }}）</template></a-tab-pane>
+    </a-tabs>
+
+    <section v-if="activeRoundTripTab === 'package' && packageRawResults.length" class="results-list"><RoundTripPackageCard v-for="item in packageRawResults" :key="item.id" :item="item" /></section>
+    <section v-else-if="activeRoundTripTab !== 'package' && renderedGroups.length" class="results-list"><FlightGroupCard v-for="group in renderedGroups" :key="group.id" :group="group" :platforms="filters.platforms" @open-booking="openBooking" /><a-button v-if="renderedGroups.length < groups.length" block @click="filters.visibleLimit += 40">加载更多（剩余 {{ groups.length - renderedGroups.length }} 条）</a-button></section>
+    <div v-else class="empty-state"><p>{{ emptyStateMessage }}</p><a-button v-if="activeRawResults.length" @click="resetFilters">清空筛选</a-button></div>
 
     <a-drawer v-model:open="drawerOpen" title="更多筛选" placement="right" :width="420">
       <p class="drawer-intro">条件会实时应用到当前查询；价格区间按已选平台中的最低可比价计算。</p>
@@ -62,17 +69,19 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import { Alert as AAlert, Button as AButton, Checkbox as ACheckbox, CheckboxGroup as ACheckboxGroup, Drawer as ADrawer, InputNumber as AInputNumber, Modal as AModal, Select as ASelect, Tag as ATag } from "ant-design-vue";
+import { Alert as AAlert, Button as AButton, Checkbox as ACheckbox, CheckboxGroup as ACheckboxGroup, Drawer as ADrawer, InputNumber as AInputNumber, Modal as AModal, Select as ASelect, TabPane as ATabPane, Tabs as ATabs, Tag as ATag } from "ant-design-vue";
 import { useTaskStore } from "../stores/task"; import { useResultsStore } from "../stores/results";
-import { BookingActionResult, BookingProgressPayload, ExtensionMessage } from "@/shared/types/message"; import { FlightResult, SupportedPlatform } from "@/shared/types/flight";
+import { BookingActionResult, BookingProgressPayload, ExtensionMessage } from "@/shared/types/message"; import { FlightLeg, FlightResult, SupportedPlatform } from "@/shared/types/flight";
 import { matchFlightsAcrossPlatforms } from "@/core/matching/flight-matcher";
 import { defaultResultFilters, displayFlightTime, filterAndSortGroups, filterCount, groupLowestVerifiedPrice, ResultFilterState, UNKNOWN_AIRLINE } from "@/core/results/result-presentation";
 import { presentFare, verifiedTotalPrice } from "@/core/results/fare-presentation";
-import FlightGroupCard from "../components/FlightGroupCard.vue"; import SearchProgressPanel from "../components/SearchProgressPanel.vue";
+import FlightGroupCard from "../components/FlightGroupCard.vue"; import SearchProgressPanel from "../components/SearchProgressPanel.vue"; import RoundTripPackageCard from "../components/RoundTripPackageCard.vue";
 
 interface ResultsFilterState extends ResultFilterState { visibleLimit: number }
+type RoundTripResultTab = FlightLeg | "package";
 const taskStore = useTaskStore(); const resultsStore = useResultsStore();
 const filters = ref<ResultsFilterState>({ ...defaultResultFilters(), visibleLimit: 40 });
+const activeRoundTripTab = ref<RoundTripResultTab>("outbound");
 const drawerOpen = ref(false); const bookingNotice = ref<{ type: "success" | "info" | "warning" | "error"; message: string }>();
 const bookingFlight = ref<FlightResult>(); const bookingConfirmOpen = ref(false); const bookingLoading = ref(false); const bookingProgressMessage = ref("正在准备平台订票验证…");
 const platformOptions = [{ value: "ctrip", label: "携程" }, { value: "qunar", label: "去哪儿" }, { value: "fliggy", label: "飞猪" }, { value: "tongcheng", label: "同程" }];
@@ -80,20 +89,43 @@ const sortOptions = [{ value: "recommended", label: "智能推荐" }, { value: "
 const periodOptions = [{ value: "all", label: "全部时段" }, { value: "morning", label: "上午出发" }, { value: "afternoon", label: "下午出发" }, { value: "evening", label: "晚上出发" }];
 const arrivalPeriodOptions = [{ value: "all", label: "全部到达时段" }, { value: "morning", label: "上午到达" }, { value: "afternoon", label: "下午到达" }, { value: "evening", label: "晚上到达" }];
 const directOptions = [{ value: "all", label: "全部航班" }, { value: "direct", label: "仅直飞" }, { value: "non_direct", label: "仅经停/中转" }];
-const baseGroups = computed(() => matchFlightsAcrossPlatforms(resultsStore.rawResults));
+const isRoundTrip = computed(() => taskStore.currentTask?.query.tripType === "roundtrip");
+const packageRawResults = computed(() => resultsStore.roundTripPackages);
+const activeRawResults = computed(() => {
+  if (!isRoundTrip.value) return resultsStore.rawResults;
+  if (activeRoundTripTab.value === "package") return [];
+  return resultsStore.rawResults.filter((flight) => flight.leg === activeRoundTripTab.value);
+});
+const baseGroups = computed(() => matchFlightsAcrossPlatforms(activeRawResults.value));
 const groups = computed(() => filterAndSortGroups(baseGroups.value, filters.value));
 const renderedGroups = computed(() => groups.value.slice(0, filters.value.visibleLimit));
+const outboundGroupCount = computed(() => matchFlightsAcrossPlatforms(resultsStore.rawResults.filter((flight) => flight.leg === "outbound")).length);
+const inboundGroupCount = computed(() => matchFlightsAcrossPlatforms(resultsStore.rawResults.filter((flight) => flight.leg === "inbound")).length);
+const packageGroupCount = computed(() => packageRawResults.value.length);
+const roundTripSummary = computed(() => {
+  const query = taskStore.currentTask?.query;
+  if (!query) return "";
+  if (activeRoundTripTab.value === "outbound") return `去程 ${query.originCity} → ${query.destinationCity} · ${query.departureDate}。分段参考价，不等同于平台往返套餐。`;
+  if (activeRoundTripTab.value === "inbound") return `返程 ${query.destinationCity} → ${query.originCity} · ${query.returnDate}。分段参考价，不等同于平台往返套餐。`;
+  return "仅展示平台真实返回的往返套餐，不会将两段单程价格相加后当作套餐价。";
+});
+const emptyStateMessage = computed(() => {
+  if (isRoundTrip.value && activeRoundTripTab.value === "package") return "暂无携程原生往返套餐结果；当前其他平台仍按去程、返程分段查询。";
+  return activeRawResults.value.length ? "没有符合当前筛选条件的航班。" : "暂无比价数据，请在“查询”页面发起一键比价。";
+});
 const directCount = computed(() => groups.value.filter((group) => group.representative.direct).length);
 const lowestComparablePrice = computed(() => { const prices = groups.value.map(groupLowestVerifiedPrice).filter((value): value is number => value !== undefined); return prices.length ? Math.min(...prices) : null; });
-const verifiedOfferCount = computed(() => resultsStore.rawResults.filter((item) => verifiedTotalPrice(item) !== undefined).length);
-const unverifiedOfferCount = computed(() => resultsStore.rawResults.length - verifiedOfferCount.value);
+const verifiedOfferCount = computed(() => activeRawResults.value.filter((item) => verifiedTotalPrice(item) !== undefined).length);
+const unverifiedOfferCount = computed(() => activeRawResults.value.length - verifiedOfferCount.value);
 const bookingFare = computed(() => bookingFlight.value ? presentFare(bookingFlight.value) : { amount: 0, confidence: "ticket_only" as const, label: "票面价", note: "附加费待平台确认" });
 const collectedAtText = computed(() => bookingFlight.value?.collectedAt ? new Date(bookingFlight.value.collectedAt).toLocaleString("zh-CN", { hour12: false }) : "时间未知");
-const airlineOptions = computed(() => Object.entries(resultsStore.rawResults.reduce<Record<string, number>>((count, item) => { const airline = item.airline?.trim() || UNKNOWN_AIRLINE; count[airline] = (count[airline] || 0) + 1; return count; }, {})).sort(([a], [b]) => a.localeCompare(b, "zh-CN")).map(([value, count]) => ({ value, label: `${value}（${count}）` })));
+const airlineOptions = computed(() => Object.entries(activeRawResults.value.reduce<Record<string, number>>((count, item) => { const airline = item.airline?.trim() || UNKNOWN_AIRLINE; count[airline] = (count[airline] || 0) + 1; return count; }, {})).sort(([a], [b]) => a.localeCompare(b, "zh-CN")).map(([value, count]) => ({ value, label: `${value}（${count}）` })));
 const departureAirportOptions = computed(() => airportOptions("departureAirport")); const arrivalAirportOptions = computed(() => airportOptions("arrivalAirport"));
 const activeFilterCount = computed(() => filterCount(filters.value));
 const activeTags = computed(() => { const tags: Array<{ key: string; label: string; clear: () => void }> = []; if (filters.value.platforms.length < platformOptions.length) tags.push({ key: "platform", label: `平台 ${filters.value.platforms.length} 个`, clear: () => filters.value.platforms = platformOptions.map((item) => item.value) as SupportedPlatform[] }); if (filters.value.direct !== "all") tags.push({ key: "direct", label: filters.value.direct === "direct" ? "仅直飞" : "仅经停/中转", clear: () => filters.value.direct = "all" }); if (filters.value.airlines.length) tags.push({ key: "airline", label: `航司 ${filters.value.airlines.length} 个`, clear: () => filters.value.airlines = [] }); if (filters.value.maxPrice !== undefined) tags.push({ key: "max", label: `≤ ¥${filters.value.maxPrice}`, clear: () => filters.value.maxPrice = undefined }); if (filters.value.minPrice !== undefined) tags.push({ key: "min", label: `≥ ¥${filters.value.minPrice}`, clear: () => filters.value.minPrice = undefined }); if (filters.value.departureAirports.length) tags.push({ key: "dep", label: `出发机场 ${filters.value.departureAirports.length} 个`, clear: () => filters.value.departureAirports = [] }); if (filters.value.arrivalAirports.length) tags.push({ key: "arr", label: `到达机场 ${filters.value.arrivalAirports.length} 个`, clear: () => filters.value.arrivalAirports = [] }); if (filters.value.departurePeriod !== "all") tags.push({ key: "depart-period", label: periodOptions.find((item) => item.value === filters.value.departurePeriod)?.label || "出发时段", clear: () => filters.value.departurePeriod = "all" }); if (filters.value.arrivalPeriod !== "all") tags.push({ key: "arrive-period", label: arrivalPeriodOptions.find((item) => item.value === filters.value.arrivalPeriod)?.label || "到达时段", clear: () => filters.value.arrivalPeriod = "all" }); if (filters.value.maxDuration !== undefined) tags.push({ key: "duration", label: `航程 ≤ ${filters.value.maxDuration} 分钟`, clear: () => filters.value.maxDuration = undefined }); if (filters.value.verifiedOnly) tags.push({ key: "verified", label: "含税已核验", clear: () => filters.value.verifiedOnly = false }); return tags; });
 watch(() => resultsStore.rawResults, () => resetFilters(), { deep: false });
+watch(activeRoundTripTab, () => resetFilters());
+watch(() => taskStore.currentTask?.id, () => { activeRoundTripTab.value = "outbound"; resetFilters(); });
 watch(() => ({ ...filters.value, visibleLimit: undefined }), () => { filters.value.visibleLimit = 40; }, { deep: true });
 onMounted(() => {
   resultsStore.markResultsViewed();
@@ -102,7 +134,7 @@ onMounted(() => {
 onUnmounted(() => {
   if (typeof chrome !== "undefined" && chrome.runtime) chrome.runtime.onMessage.removeListener(handleBookingProgress);
 });
-function airportOptions(field: "departureAirport" | "arrivalAirport") { return [...new Set(resultsStore.rawResults.map((item) => item[field]).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-CN")).map((value) => ({ value, label: value })); }
+function airportOptions(field: "departureAirport" | "arrivalAirport") { return [...new Set(activeRawResults.value.map((item) => item[field]).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-CN")).map((value) => ({ value, label: value })); }
 function resetFilters() { filters.value = { ...defaultResultFilters(), visibleLimit: 40 }; }
 function retryPlatform(platform: SupportedPlatform) { const taskId = taskStore.currentTask?.id; if (taskId && chrome?.runtime) chrome.runtime.sendMessage({ type: "RETRY_PLATFORM", taskId, platform, payload: { taskId, platform } }); }
 function openPlatformLogin(platform: SupportedPlatform) { const taskId = taskStore.currentTask?.id; if (taskId && chrome?.runtime) chrome.runtime.sendMessage({ type: "OPEN_PLATFORM_LOGIN", taskId, platform, payload: { taskId, platform } }); }
@@ -129,4 +161,4 @@ function confirmBooking() {
 
 <style scoped>
 .page-container{max-width:1180px;width:100%;margin:0 auto;padding:var(--space-5);padding-bottom:88px}.page-header{display:flex;justify-content:space-between;gap:var(--space-3);align-items:flex-start;margin-bottom:var(--space-3)}.page-header h2{margin:0;font-size:var(--font-title);letter-spacing:-.02em}.result-summary{margin:var(--space-1) 0 0;font-size:var(--font-caption);color:var(--text-muted)}.result-summary b{color:var(--success-color);font-variant-numeric:tabular-nums}.quick-filters{position:sticky;top:var(--space-2);z-index:8;display:flex;gap:var(--space-2);flex-wrap:wrap;align-items:center;padding:var(--space-2);border:1px solid var(--border-color);background:color-mix(in srgb,var(--bg-secondary) 94%,transparent);backdrop-filter:blur(12px);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)}.quick-airline{min-width:180px;flex:1}.quick-select,.quick-sort{min-width:145px}.quick-price{width:136px}.more-filter-button{margin-left:auto}.filter-tags{display:flex;align-items:center;gap:var(--space-1);flex-wrap:wrap;margin:var(--space-2) 0}.data-quality{display:flex;align-items:center;gap:var(--space-1);flex-wrap:wrap;margin:var(--space-2) 0 var(--space-3);font-size:var(--font-caption);color:var(--text-secondary)}.data-quality b{color:var(--success-color);font-variant-numeric:tabular-nums}.data-quality em{font-style:normal;color:var(--text-muted)}.booking-notice{margin-bottom:var(--space-3)}.results-list{display:grid;gap:0}.empty-state{text-align:center;color:var(--text-muted);padding:64px 0;font-size:var(--font-body)}.drawer-intro{margin:0 0 var(--space-5);font-size:var(--font-caption);line-height:1.6;color:var(--text-secondary)}.filter-group{padding:var(--space-4) 0;border-top:1px solid var(--border-color)}.filter-group:first-of-type{padding-top:0;border-top:0}.filter-group h3{margin:0 0 var(--space-3);font-size:var(--font-body);letter-spacing:-.01em}.drawer-section{display:flex;flex-direction:column;gap:var(--space-2);margin-bottom:var(--space-4)}.drawer-section label{display:block;font-size:var(--font-caption);font-weight:600;color:var(--text-secondary)}.drawer-section :deep(.ant-select),.drawer-section :deep(.ant-input-number){width:100%}.two-column{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)}.two-column>div{min-width:0}.drawer-actions{display:flex;justify-content:space-between;gap:var(--space-2)}.booking-intro,.booking-warning,.booking-progress{font-size:var(--font-caption);color:var(--text-secondary);line-height:1.65}.booking-progress{margin-top:var(--space-3);color:var(--accent-color)}.booking-warning{color:var(--text-muted);margin-top:var(--space-3)}.booking-details{display:grid;gap:var(--space-2);margin:var(--space-4) 0}.booking-details div{display:grid;grid-template-columns:72px 1fr;gap:var(--space-2)}.booking-details dt{font-size:var(--font-caption);color:var(--text-muted)}.booking-details dd{margin:0;font-size:var(--font-caption);color:var(--text-primary)}.booking-details dd.verified_total{color:var(--success-color)}.booking-details dd.ticket_only{color:var(--warning-color)}@media(max-width:620px){.page-container{padding:var(--space-4);padding-bottom:80px}.quick-filters{top:0}.quick-airline{min-width:130px}.quick-sort{flex:1}.more-filter-button{margin-left:0}.page-header{align-items:center}.page-header h2{font-size:19px}.two-column{grid-template-columns:1fr}}
-</style>
+.roundtrip-tabs{margin:var(--space-4) 0 var(--space-3);padding:0 var(--space-2);border:1px solid var(--border-color);border-radius:var(--radius-lg);background:var(--bg-secondary)}.roundtrip-tabs :deep(.ant-tabs-nav){margin:0}.roundtrip-tabs :deep(.ant-tabs-content-holder){display:none}.roundtrip-tabs :deep(.ant-tabs-tab){min-height:44px;padding:10px var(--space-4)}.roundtrip-tabs :deep(.ant-tabs-tab-btn){font-weight:600}</style>
