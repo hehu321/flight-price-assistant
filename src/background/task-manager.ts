@@ -23,6 +23,7 @@ import { QuerySnapshot } from "@/shared/types/storage";
 import { markReachedWatches } from "@/core/storage/price-watch-repository";
 import { snapshotLowest } from "@/core/analytics/history-analysis";
 import { buildRoundTripLegQueries, getRoundTripPlatformPlan } from "@/core/query/roundtrip-plan";
+import { saveDiagnostic } from "@/core/storage/diagnostic-repository";
 
 registerAllAdapters();
 
@@ -68,16 +69,15 @@ class TaskManager {
       this.roundTripQueries.set(task.id, Object.fromEntries(roundTripLegs.map(({ leg, query: legQuery }) => [leg, legQuery])) as Record<FlightLeg, FlightQuery>);
       this.completedRoundTripLegs.set(task.id, new Map());
     }
-    // Round trips intentionally start with the outbound leg. The return leg
-    // is opened only after that platform has a terminal outbound result so a
-    // foreground Ctrip session never competes with itself.
+    // A round-trip is always backed by two independently queryable legs.
+    // Native packages are intentionally delayed until these reliable results
+    // finish, so a package-picker failure can never erase the baseline.
     for (const platformId of query.enabledPlatforms) {
       const config = platformConfigs.find((p) => p.id === platformId);
       const delayMs = config ? config.openDelayMs : 0;
 
       setTimeout(() => {
-        const useNativeRoundTrip = query.tripType === "roundtrip" && getRoundTripPlatformPlan(platformId).nativeAvailability === "verified";
-        this.runPlatformTask(task.id, platformId, useNativeRoundTrip ? query : (roundTripLegs[0]?.query || query), useNativeRoundTrip ? undefined : roundTripLegs[0]?.leg);
+        this.runPlatformTask(task.id, platformId, roundTripLegs[0]?.query || query, roundTripLegs[0]?.leg);
       }, delayMs);
     }
 
@@ -104,6 +104,9 @@ class TaskManager {
     try {
       const previousTabId = platform === "ctrip" ? await this.getActiveTabId() : undefined;
       const tabId = await tabManager.openPlatformTab(taskId, platform, searchUrl, { active: platform === "ctrip", leg });
+      this.activeTask.platforms[platform].tabId = tabId;
+      this.activeTask.platforms[platform].leg = leg;
+      await saveCurrentTask(this.activeTask);
       if (platform === "ctrip") {
         this.ctripForegroundSessions.set(taskId, { ctripTabId: tabId, previousTabId });
         this.updatePlatformStatus(taskId, platform, "loading", 30, "携程正在前台加载完整航班列表，完成后将自动返回");
@@ -147,6 +150,9 @@ class TaskManager {
     }
     this.broadcastTaskState(taskId, platform, currentPlatformState);
     this.notifyObservers();
+    if (["failed", "page_timeout", "page_changed", "needs_user_action", "interrupted"].includes(status)) {
+      void this.recordDiagnostic(taskId, platform, "task", status === "needs_user_action" ? "warning" : "error", currentPlatformState.errorCode, message);
+    }
   }
 
   async savePlatformResults(taskId: string, platform: SupportedPlatform, results: FlightResult[], leg?: FlightLeg) {
@@ -160,6 +166,7 @@ class TaskManager {
     if (results.length > 0) await this.restoreAfterCtripCollection(taskId, platform);
 
     let shouldStartInbound = false;
+    let shouldStartNativePackage = false;
     if (this.activeTask && this.activeTask.id === taskId) {
       this.activeTask.platforms[platform].resultCount = this.collectedResults.get(taskId)!.get(platform)!.length;
       if (effectiveLeg && this.roundTripQueries.has(taskId)) {
@@ -169,6 +176,7 @@ class TaskManager {
           shouldStartInbound = true;
         } else {
           this.updatePlatformStatus(taskId, platform, "completed", 100, `往返两程提取完成，共${this.activeTask.platforms[platform].resultCount}条结果`);
+          shouldStartNativePackage = platform === "ctrip";
         }
       } else this.updatePlatformStatus(taskId, platform, "completed", 100, `提取成功, 获得${results.length}条结果`);
     }
@@ -212,6 +220,7 @@ class TaskManager {
     // The outbound temporary page must be restored/closed before Ctrip starts
     // an inbound foreground session; otherwise the two legs overwrite state.
     if (shouldStartInbound) await this.runInboundLeg(taskId, platform);
+    if (shouldStartNativePackage) await this.startNativePackageCollection(taskId, platform);
   }
 
   async savePlatformProgress(taskId: string, platform: SupportedPlatform, results: FlightResult[], message: string, leg?: FlightLeg) {
@@ -241,11 +250,9 @@ class TaskManager {
     if (!await this.ensureActiveTask(taskId) || !this.activeTask || this.activeTask.id !== taskId) return;
     this.activeTask.roundTripPackages ||= {};
     this.activeTask.roundTripPackages[platform] = packages;
-    this.activeTask.platforms[platform].resultCount = packages.length;
-    this.updatePlatformStatus(taskId, platform, completed ? "completed" : "extracting", completed ? 100 : 72, message);
+    this.updatePackageStatus(taskId, platform, completed ? "completed" : "extracting", completed ? 100 : 72, message, packages.length);
     await saveCurrentTask(this.activeTask);
     await saveQuerySnapshot(this.toQuerySnapshot(taskId));
-    this.broadcastTaskState(taskId, platform, this.activeTask.platforms[platform]);
     this.notifyObservers();
     if (completed) {
       await this.restoreAfterCtripCollection(taskId, platform);
@@ -253,17 +260,59 @@ class TaskManager {
     }
   }
 
+  private packageState(taskId: string, platform: SupportedPlatform): PlatformTaskState | undefined {
+    if (!this.activeTask || this.activeTask.id !== taskId) return undefined;
+    this.activeTask.roundTripPackageStates ||= {};
+    if (!this.activeTask.roundTripPackageStates[platform]) {
+      const now = new Date().toISOString();
+      this.activeTask.roundTripPackageStates[platform] = {
+        platformId: platform, taskId, status: "idle", progress: 0,
+        message: "等待套餐采集", retryable: true, resultCount: 0,
+        createdAt: now, updatedAt: now,
+      };
+    }
+    return this.activeTask.roundTripPackageStates[platform];
+  }
+
+  private updatePackageStatus(
+    taskId: string,
+    platform: SupportedPlatform,
+    status: PlatformTaskStatus,
+    progress: number,
+    message: string,
+    resultCount?: number,
+    errorCode?: string,
+  ): void {
+    const state = this.packageState(taskId, platform);
+    if (!state || !this.activeTask) return;
+    state.status = status;
+    state.progress = progress;
+    state.message = message;
+    state.errorCode = errorCode;
+    state.retryable = !["completed", "empty", "cancelled"].includes(status);
+    if (resultCount !== undefined) state.resultCount = resultCount;
+    state.updatedAt = new Date().toISOString();
+    this.activeTask.updatedAt = state.updatedAt;
+    void saveCurrentTask(this.activeTask);
+    void saveQuerySnapshot(this.toQuerySnapshot(taskId));
+    this.broadcastTaskState(taskId, platform, this.activeTask.platforms[platform], state);
+    this.notifyObservers();
+  }
+
   async getCurrentSnapshot(): Promise<{ task: ComparisonTask | null; results: Record<SupportedPlatform, FlightResult[]> }> {
     if (!this.activeTask) {
       const task = await getCurrentTask();
       if (task) {
         this.activeTask = task;
-        // A Service Worker does not retain timers or tab bindings.  After a
-        // manual extension reload, an in-progress persisted task therefore
-        // has no executor left.  Keep its collected results but expose it as
-        // retryable instead of restoring an endless loading state.
+        if (task.query.tripType === "roundtrip") {
+          const legs = buildRoundTripLegQueries(task.query);
+          if (legs.length === 2) this.roundTripQueries.set(task.id, Object.fromEntries(legs.map(({ leg, query }) => [leg, query])) as Record<FlightLeg, FlightQuery>);
+        }
+        // A service-worker restart loses timers and the in-memory tab map.
+        // Recover only extension-owned tabs persisted with the task; never
+        // scan or adopt an unrelated user result page.
         if (isTaskInProgress(task)) {
-          this.markTaskInterruptedAfterWorkerRestart(task);
+          await this.resumeTaskAfterWorkerRestart(task);
           await saveCurrentTask(task);
           await saveQuerySnapshot(this.toQuerySnapshot(task.id));
         }
@@ -297,6 +346,56 @@ class TaskManager {
       state.updatedAt = now;
     }
     task.updatedAt = now;
+  }
+
+  private async resumeTaskAfterWorkerRestart(task: ComparisonTask): Promise<void> {
+    let resumed = false;
+    const now = new Date().toISOString();
+    for (const platform of task.query.enabledPlatforms) {
+      const state = task.platforms[platform];
+      if (!state || !isTransientPlatformStatus(state.status)) continue;
+      if (state.tabId === undefined) {
+        state.status = "interrupted";
+        state.errorCode = "BACKGROUND_RESTARTED";
+        state.retryable = true;
+        state.message = "插件后台已重载，未找到原采集标签页；可重新提取";
+        state.updatedAt = now;
+        continue;
+      }
+      try {
+        await chrome.tabs.get(state.tabId);
+        tabManager.restorePlatformTab({ taskId: task.id, platform, tabId: state.tabId, leg: state.leg, temporary: true, createdAt: state.createdAt });
+        const query = state.leg ? this.roundTripQueries.get(task.id)?.[state.leg] : task.query;
+        if (!query) continue;
+        this.requestAdapterExecution(state.tabId, task.id, platform, query, state.leg);
+        resumed = true;
+      } catch {
+        // The next block marks this platform retryable rather than pretending
+        // that a closed tab is still collecting.
+        state.status = "interrupted";
+        state.errorCode = "BACKGROUND_RESTARTED";
+        state.retryable = true;
+        state.message = "插件后台已重载，原采集标签页已关闭；可重新提取";
+        state.updatedAt = now;
+      }
+    }
+    const packageState = task.roundTripPackageStates?.ctrip;
+    if (packageState && isTransientPlatformStatus(packageState.status)) {
+      if (packageState.tabId === undefined) {
+        this.failRoundTripPackage(task.id, "ctrip", { code: "BACKGROUND_RESTARTED", message: "插件后台已重载，未找到原套餐页面", retryable: true });
+      } else {
+        try {
+          await chrome.tabs.get(packageState.tabId);
+          tabManager.restorePlatformTab({ taskId: task.id, platform: "ctrip", tabId: packageState.tabId, collectionScope: "package", temporary: true, createdAt: packageState.createdAt });
+          this.requestAdapterExecution(packageState.tabId, task.id, "ctrip", task.query);
+          resumed = true;
+        } catch {
+          this.failRoundTripPackage(task.id, "ctrip", { code: "BACKGROUND_RESTARTED", message: "插件后台已重载，原套餐页面已关闭", retryable: true });
+        }
+      }
+    }
+    if (resumed) this.scheduleTaskTimeout(task.id, 180);
+    else this.markTaskInterruptedAfterWorkerRestart(task);
   }
 
   async retryPlatform(taskId: string, platform: SupportedPlatform): Promise<void> {
@@ -347,6 +446,24 @@ class TaskManager {
     this.requestAdapterExecution(binding.tabId, taskId, platform, this.activeTask.query);
   }
 
+  async retryRoundTripPackage(taskId: string, platform: SupportedPlatform): Promise<void> {
+    if (!this.activeTask || this.activeTask.id !== taskId || platform !== "ctrip" || this.activeTask.query.tripType !== "roundtrip") return;
+    const state = this.packageState(taskId, platform);
+    if (!state) return;
+    state.status = "idle";
+    state.progress = 0;
+    state.errorCode = undefined;
+    state.message = "已请求重新读取往返套餐";
+    state.retryable = true;
+    state.updatedAt = new Date().toISOString();
+    await saveCurrentTask(this.activeTask);
+    await this.startNativePackageCollection(taskId, platform);
+  }
+
+  markRoundTripPackagePageReady(taskId: string, platform: SupportedPlatform): void {
+    this.updatePackageStatus(taskId, platform, "waiting_results", 60, "套餐页面加载就绪，准备读取原生往返总价");
+  }
+
   failPlatform(
     taskId: string,
     platform: SupportedPlatform,
@@ -367,6 +484,7 @@ class TaskManager {
     } else {
       this.updatePlatformStatus(taskId, platform, "failed", 0, error.message);
       void this.closeCompletedPlatformTab(taskId, platform, leg);
+      if (leg === "inbound" && platform === "ctrip") void this.startNativePackageCollection(taskId, platform);
     }
     void this.restoreAfterCtripCollection(taskId, platform);
   }
@@ -381,6 +499,7 @@ class TaskManager {
     } else {
       this.updatePlatformStatus(taskId, platform, "empty", 100, message);
       void this.closeCompletedPlatformTab(taskId, platform, leg);
+      if (leg === "inbound" && platform === "ctrip") void this.startNativePackageCollection(taskId, platform);
     }
   }
 
@@ -566,14 +685,14 @@ class TaskManager {
     if (!this.monitorTaskIds.has(taskId) && await this.shouldKeepPlatformTabs()) return;
     await this.restoreAfterCtripCollection(taskId, platform);
     const binding = tabManager.getTabBinding(taskId, platform, leg);
-    if (!binding) return;
+    if (!binding || binding.temporary !== true) return;
     if (this.isBookingNavigation(binding.tabId)) return;
     await tabManager.closeTab(binding.tabId);
     logger.info(`采集完成后自动关闭${platformName(platform)}平台标签页: ${binding.tabId}`);
   }
 
   private async closeTaskPlatformTabs(taskId: string): Promise<void> {
-    await Promise.all(tabManager.getTaskBindings(taskId).map(async (binding) => {
+    await Promise.all(tabManager.getTaskBindings(taskId).filter((binding) => binding.temporary === true).map(async (binding) => {
       if (this.isBookingNavigation(binding.tabId)) return;
       await this.restoreAfterCtripCollection(taskId, binding.platform);
       await tabManager.closeTab(binding.tabId);
@@ -615,6 +734,53 @@ class TaskManager {
     const inbound = this.roundTripQueries.get(taskId)?.inbound;
     if (!inbound || this.cancelledTaskIds.has(taskId)) return;
     await this.runPlatformTask(taskId, platform, inbound, "inbound");
+  }
+
+  /** Collect native Ctrip packages only after both reliable legs are done.
+   * This owns the default Ctrip binding; leg bindings stay independent. */
+  private async startNativePackageCollection(taskId: string, platform: SupportedPlatform): Promise<void> {
+    if (!this.activeTask || this.activeTask.id !== taskId || this.cancelledTaskIds.has(taskId)) return;
+    if (platform !== "ctrip" || this.activeTask.query.tripType !== "roundtrip" || getRoundTripPlatformPlan(platform).nativeAvailability !== "verified") return;
+    const state = this.packageState(taskId, platform);
+    if (!state || ["creating_tab", "opening", "loading", "extracting", "completed"].includes(state.status)) return;
+    this.updatePackageStatus(taskId, platform, "creating_tab", 10, "正在补充携程原生往返套餐");
+    const adapter = adapterRegistry.getAdapter(platform);
+    const searchUrl = adapter?.buildSearchUrl(this.activeTask.query);
+    if (!adapter || !searchUrl) {
+      this.failRoundTripPackage(taskId, platform, { code: "SEARCH_URL_UNAVAILABLE", message: "无法打开携程往返套餐页面", retryable: true });
+      return;
+    }
+    try {
+      const previousTabId = await this.getActiveTabId();
+      const tabId = await tabManager.openPlatformTab(taskId, platform, searchUrl, { active: true, collectionScope: "package" });
+      this.ctripForegroundSessions.set(taskId, { ctripTabId: tabId, previousTabId });
+      const packageState = this.packageState(taskId, platform);
+      if (packageState) packageState.tabId = tabId;
+      this.updatePackageStatus(taskId, platform, "loading", 30, "携程正在前台读取原生往返套餐，分段结果不受影响");
+    } catch {
+      this.failRoundTripPackage(taskId, platform, { code: "TAB_OPEN_FAILED", message: "无法打开携程往返套餐页面", retryable: true });
+    }
+  }
+
+  failRoundTripPackage(
+    taskId: string,
+    platform: SupportedPlatform,
+    error: { code: string; message: string; retryable: boolean },
+  ): void {
+    if (!this.activeTask || this.activeTask.id !== taskId) return;
+    this.activeTask.roundTripPackages ||= {};
+    this.activeTask.roundTripPackages[platform] ||= [];
+    this.updatePackageStatus(taskId, platform, "failed", 100, `${error.message}；去程和返程分段结果仍可参考`, 0, error.code);
+    void this.recordDiagnostic(taskId, platform, "package", "warning", error.code, error.message);
+    void this.restoreAfterCtripCollection(taskId, platform);
+    void this.closeCompletedPlatformTab(taskId, platform);
+  }
+
+  blockRoundTripPackage(taskId: string, platform: SupportedPlatform, state: string, message?: string): void {
+    if (!this.activeTask || this.activeTask.id !== taskId) return;
+    const code = state === "login_required" ? "LOGIN_REQUIRED" : state.toUpperCase();
+    this.updatePackageStatus(taskId, platform, "needs_user_action", 50, message || "携程往返套餐页面需要完成登录或验证后再重试", undefined, code);
+    void this.recordDiagnostic(taskId, platform, "package", "warning", code, message || "套餐页面需要用户处理");
   }
 
   private shouldFallbackNativeRoundTrip(taskId: string, platform: SupportedPlatform, leg: FlightLeg | undefined, errorCode: string): boolean {
@@ -660,6 +826,17 @@ class TaskManager {
 
   private nativeFallbackKey(taskId: string, platform: SupportedPlatform): string {
     return `${taskId}:${platform}`;
+  }
+
+  private async recordDiagnostic(
+    taskId: string,
+    platform: SupportedPlatform | undefined,
+    stage: "task" | "adapter" | "context" | "package" | "booking",
+    level: "info" | "warning" | "error",
+    code: string | undefined,
+    message: string,
+  ): Promise<void> {
+    await saveDiagnostic({ id: generateId("diagnostic"), taskId, platform, stage, level, code, message, adapterVersion: "0.0.3", createdAt: new Date().toISOString() });
   }
 
   private async shouldKeepPlatformTabs(): Promise<boolean> {
@@ -747,13 +924,13 @@ class TaskManager {
     return snapshot.task?.id === taskId;
   }
 
-  private broadcastTaskState(taskId: string, platform: SupportedPlatform, state: PlatformTaskState) {
+  private broadcastTaskState(taskId: string, platform: SupportedPlatform, state: PlatformTaskState, packageState?: PlatformTaskState) {
     if (typeof chrome !== "undefined" && chrome.runtime) {
       chrome.runtime.sendMessage({
         type: "TASK_STATE_CHANGED",
         taskId,
         platform,
-        payload: { taskId, platform, state, results: this.getResultsForTask(taskId)[platform], packages: this.activeTask?.roundTripPackages?.[platform] || [] },
+        payload: { taskId, platform, state, packageState, results: this.getResultsForTask(taskId)[platform], packages: this.activeTask?.roundTripPackages?.[platform] || [] },
       }).catch(() => {});
     }
   }
@@ -830,6 +1007,15 @@ class TaskManager {
         updatedAt: state.updatedAt,
       }])) as QuerySnapshot["platforms"],
       results: this.getResultsForTask(taskId),
+      roundTripPackages: task.roundTripPackages,
+      packageStates: task.roundTripPackageStates && Object.fromEntries(Object.entries(task.roundTripPackageStates).map(([platform, state]) => [platform, {
+        status: state.status,
+        message: state.message,
+        resultCount: state.resultCount,
+        errorCode: state.errorCode,
+        updatedAt: state.updatedAt,
+      }])) as QuerySnapshot["packageStates"],
+      dataScopeVersion: 2,
     };
   }
 }
@@ -922,7 +1108,9 @@ function isTaskTerminalStatus(status: PlatformTaskStatus): boolean {
 }
 
 function tagRoundTripLeg(results: FlightResult[], leg?: FlightLeg): FlightResult[] {
-  return leg ? results.map((flight) => ({ ...flight, leg, roundTripPricingMode: "split_fallback" })) : results;
+  return results.map((flight) => leg
+    ? { ...flight, leg, roundTripPricingMode: "split_fallback", resultScope: leg === "outbound" ? "roundtrip_outbound" : "roundtrip_inbound" }
+    : { ...flight, resultScope: "oneway" });
 }
 
 function replaceLegResults(current: FlightResult[], incoming: FlightResult[], leg?: FlightLeg): FlightResult[] {

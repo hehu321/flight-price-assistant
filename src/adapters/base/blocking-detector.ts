@@ -1,4 +1,4 @@
-import { BlockingDetectionResult, BlockingState } from "@/shared/types/platform";
+import { BlockingDetectionResult } from "@/shared/types/platform";
 
 export function detectCommonBlockingState(): BlockingDetectionResult {
   const url = window.location.href.toLowerCase();

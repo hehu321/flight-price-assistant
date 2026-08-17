@@ -15,7 +15,7 @@ class TabManager {
     taskId: string,
     platform: SupportedPlatform,
     url: string,
-    options: { active?: boolean; leg?: FlightLeg } = {}
+    options: { active?: boolean; leg?: FlightLeg; collectionScope?: "package" } = {}
   ): Promise<number> {
     const key = `${taskId}_${platform}_${options.leg || "default"}`;
     const existing = this.bindings.get(key);
@@ -34,12 +34,12 @@ class TabManager {
     if (typeof chrome !== "undefined" && chrome.tabs) {
       const tab = await chrome.tabs.create({ url, active: options.active ?? false });
       const tabId = tab.id!;
-      this.bindings.set(key, { taskId, platform, tabId, leg: options.leg, createdAt: new Date().toISOString() });
+      this.bindings.set(key, { taskId, platform, tabId, leg: options.leg, collectionScope: options.collectionScope, temporary: true, createdAt: new Date().toISOString() });
       return tabId;
     } else {
       // Mock 环境 fallback
       const mockTabId = Math.floor(Math.random() * 10000);
-      this.bindings.set(key, { taskId, platform, tabId: mockTabId, leg: options.leg, createdAt: new Date().toISOString() });
+      this.bindings.set(key, { taskId, platform, tabId: mockTabId, leg: options.leg, collectionScope: options.collectionScope, temporary: true, createdAt: new Date().toISOString() });
       return mockTabId;
     }
   }
@@ -53,6 +53,10 @@ class TabManager {
       if (binding.tabId === tabId) return binding;
     }
     return undefined;
+  }
+
+  restorePlatformTab(binding: PlatformTabBinding): void {
+    this.bindings.set(`${binding.taskId}_${binding.platform}_${binding.leg || "default"}`, { ...binding, temporary: true });
   }
 
   /** Return every temporary result page owned by a task, including both legs. */

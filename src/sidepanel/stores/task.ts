@@ -21,5 +21,12 @@ export const useTaskStore = defineStore("task", {
         this.isComparing = isTaskInProgress(this.currentTask);
       }
     },
+    updatePackageState(platform: SupportedPlatform, state: PlatformTaskState) {
+      if (this.currentTask) {
+        this.currentTask.roundTripPackageStates ||= {};
+        this.currentTask.roundTripPackageStates[platform] = state;
+        this.isComparing = isTaskInProgress(this.currentTask);
+      }
+    },
   },
 });

@@ -15,7 +15,7 @@ import {
   AgentRunResponse,
   AgentSearchRequest,
 } from "@/shared/types/agent";
-import { FlightQuery, FlightResult, SupportedPlatform } from "@/shared/types/flight";
+import { FlightQuery, FlightResult, RoundTripPackageResult, SupportedPlatform } from "@/shared/types/flight";
 import { ComparisonTask, PlatformTaskState } from "@/shared/types/platform";
 import { generateId } from "@/shared/utils/id-generator";
 import { taskManager } from "./task-manager";
@@ -177,6 +177,8 @@ class RunCoordinator {
       expiresAt: new Date(Date.now() + RUN_RETENTION_MS).toISOString(),
       platformStates: initialTask.platforms,
       results: emptyResults(),
+      roundTripPackages: {},
+      packageStates: initialTask.roundTripPackageStates,
       warnings: [],
     };
     await saveAgentRun(run);
@@ -213,11 +215,15 @@ class RunCoordinator {
     if (!run || run.status === "cancelled" || run.status === "expired") return;
     run.platformStates = cloneStates(task.platforms);
     run.results = mergeResultMaps(run.results, results);
+    run.roundTripPackages = task.roundTripPackages;
+    run.packageStates = task.roundTripPackageStates;
     run.updatedAt = new Date().toISOString();
     run.version += 1;
     const selected = run.query.enabledPlatforms.map((platform) => run.platformStates[platform]);
     const waitingUser = selected.some((state) => state.status === "needs_user_action" || state.status === "login_required" || state.status === "captcha_required" || state.status === "sms_verification_required");
-    const allTerminal = selected.every((state) => TERMINAL_PLATFORM_STATUSES.has(state.status));
+    const packageStates = Object.values(task.roundTripPackageStates || {});
+    const allTerminal = selected.every((state) => TERMINAL_PLATFORM_STATUSES.has(state.status))
+      && packageStates.every((state) => TERMINAL_PLATFORM_STATUSES.has(state.status));
     const resultCount = Object.values(run.results).flat().length;
 
     if (waitingUser) {
@@ -289,7 +295,10 @@ function normalizeAgentQuery(input: AgentSearchRequest): FlightQuery {
 
 function toPublicRun(run: AgentRun, sinceVersion?: number): AgentRunResponse {
   const flights = Object.values(run.results).flat().map(toPublicFlight);
-  const comparablePrices = flights.flatMap((flight) => flight.totalPrice === undefined ? [] : [flight.totalPrice]).filter((price) => Number.isFinite(price));
+  const packages = Object.values(run.roundTripPackages || {}).flat().map(toPublicPackage);
+  const comparablePrices = run.query.tripType === "roundtrip"
+    ? packages.map((item) => item.displayedTotalPrice)
+    : flights.flatMap((flight) => flight.totalPrice === undefined ? [] : [flight.totalPrice]).filter((price) => Number.isFinite(price));
   const displayedPrices = flights.map((flight) => flight.displayedPrice).filter((price) => Number.isFinite(price));
   const selected = run.query.enabledPlatforms.map((platform) => run.platformStates[platform]);
   const progress = selected.length ? Math.round(selected.reduce((sum, state) => sum + state.progress, 0) / selected.length) : 0;
@@ -312,6 +321,8 @@ function toPublicRun(run: AgentRun, sinceVersion?: number): AgentRunResponse {
       return [platform, { status: state.status, progress: state.progress, message: state.message, resultCount: state.resultCount, errorCode: state.errorCode, retryable: state.retryable, updatedAt: state.updatedAt }];
     })) as AgentRunResponse["platforms"],
     flights,
+    packages: packages.length ? packages : undefined,
+    packageStates: run.packageStates && Object.fromEntries(Object.entries(run.packageStates).map(([platform, state]) => [platform, { status: state.status, progress: state.progress, message: state.message, resultCount: state.resultCount, errorCode: state.errorCode, retryable: state.retryable, updatedAt: state.updatedAt }])),
     warnings: run.warnings,
   };
 }
@@ -347,7 +358,13 @@ function toPublicFlight(flight: FlightResult): AgentPublicFlight {
     collectedAt: flight.collectedAt,
     resultPageUrl: sanitizeResultUrl(flight.sourceUrl),
     warnings: flight.warnings,
+    leg: flight.leg,
+    resultScope: flight.resultScope,
   };
+}
+
+function toPublicPackage(item: RoundTripPackageResult) {
+  return { id: item.id, platform: item.platform, resultScope: "roundtrip_package" as const, outbound: item.outbound, inbound: item.inbound, displayedTotalPrice: item.displayedTotalPrice, isStartingPrice: item.isStartingPrice, currency: item.currency, confidence: item.confidence, collectedAt: item.collectedAt, resultPageUrl: sanitizeResultUrl(item.sourceUrl), warnings: item.warnings };
 }
 
 function sanitizeResultUrl(value: string): string {

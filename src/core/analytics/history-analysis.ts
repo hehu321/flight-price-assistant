@@ -201,11 +201,27 @@ export function buildAlternatives(snapshot: QuerySnapshot): AlternativeRecommend
 }
 
 export function snapshotLowest(snapshot: QuerySnapshot): number | undefined {
+  if (snapshot.query.tripType === "roundtrip") {
+    // Older snapshots mixed both legs into a single price series. Keep them
+    // visible as records, but never turn that into a false round-trip total.
+    if (snapshot.dataScopeVersion !== 2) return undefined;
+    const prices = Object.values(snapshot.roundTripPackages || {}).flat()
+      .map((item) => item.displayedTotalPrice)
+      .filter((price) => Number.isFinite(price) && price > 0);
+    return prices.length ? Math.min(...prices) : undefined;
+  }
   const prices = comparableFlights(snapshot).map(priceOf);
   return prices.length ? Math.min(...prices) : undefined;
 }
 
 export function platformLowest(snapshot: QuerySnapshot, platform: SupportedPlatform): number | undefined {
+  if (snapshot.query.tripType === "roundtrip") {
+    if (snapshot.dataScopeVersion !== 2) return undefined;
+    const prices = (snapshot.roundTripPackages?.[platform] || [])
+      .map((item) => item.displayedTotalPrice)
+      .filter((price) => Number.isFinite(price) && price > 0);
+    return prices.length ? Math.min(...prices) : undefined;
+  }
   const prices = snapshot.results[platform].filter(isComparableFlight).map(priceOf);
   return prices.length ? Math.min(...prices) : undefined;
 }

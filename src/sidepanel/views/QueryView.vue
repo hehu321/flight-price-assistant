@@ -72,7 +72,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import {
   Button as AButton,
   Checkbox as ACheckbox,
@@ -102,6 +102,10 @@ const adultOptions = [{ value: 1, label: "1 成人" }, { value: 2, label: "2 成
 const cabinOptions = [{ value: "economy", label: "经济舱" }, { value: "premium_economy", label: "超级经济舱" }, { value: "business", label: "公务舱" }, { value: "first", label: "头等舱" }];
 const platformOptions = [{ value: "ctrip", label: "携程旅行" }, { value: "qunar", label: "去哪儿旅行" }, { value: "fliggy", label: "飞猪旅行" }, { value: "tongcheng", label: "同程旅行" }];
 
+onMounted(() => {
+  void queryStore.restoreLastRoute();
+});
+
 function swapCities() {
   const tmp = queryStore.query.originCity;
   const tmpCode = queryStore.query.originCityCode;
@@ -126,12 +130,14 @@ function handleStartComparison() {
       payload: { query: queryStore.query },
     }, (res) => {
       if (res && res.task) {
+        void queryStore.rememberCurrentRoute();
         taskStore.setTask(res.task);
         router.push("/results");
       }
     });
   } else {
     // Mock 环境直接跳转
+    void queryStore.rememberCurrentRoute();
     router.push("/results");
   }
 }

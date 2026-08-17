@@ -23,8 +23,10 @@ export function isPlatformTaskTerminalForUi(status: PlatformTaskStatus): boolean
 }
 
 export function isTaskInProgress(task: ComparisonTask): boolean {
-  return task.query.enabledPlatforms.some((platform) => {
+  const platformBusy = task.query.enabledPlatforms.some((platform) => {
     const state = task.platforms[platform];
     return state !== undefined && !isPlatformTaskTerminalForUi(state.status);
   });
+  const packageBusy = Object.values(task.roundTripPackageStates || {}).some((state) => state !== undefined && !isPlatformTaskTerminalForUi(state.status));
+  return platformBusy || packageBusy;
 }

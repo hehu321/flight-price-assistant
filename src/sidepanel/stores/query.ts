@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { FlightQuery, SupportedPlatform } from "@/shared/types/flight";
 import { findCityAirports } from "@/core/query/airport-dictionary";
+import { getLastRouteSelection, saveLastRouteSelection } from "@/core/storage/last-route-repository";
 
 const defaultDepartureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
   .toISOString()
@@ -41,6 +42,22 @@ export const useQueryStore = defineStore("query", {
     synchronizeCityCodes() {
       this.query.originCityCode = findCityAirports(this.query.originCity)?.cityCode;
       this.query.destinationCityCode = findCityAirports(this.query.destinationCity)?.cityCode;
+    },
+    async restoreLastRoute() {
+      const lastRoute = await getLastRouteSelection();
+      if (!lastRoute) return;
+
+      this.query.originCity = lastRoute.originCity;
+      this.query.originCityCode = lastRoute.originCityCode;
+      this.query.originAirport = lastRoute.originAirport;
+      this.query.originAirportCode = lastRoute.originAirportCode;
+      this.query.destinationCity = lastRoute.destinationCity;
+      this.query.destinationCityCode = lastRoute.destinationCityCode;
+      this.query.destinationAirport = lastRoute.destinationAirport;
+      this.query.destinationAirportCode = lastRoute.destinationAirportCode;
+    },
+    async rememberCurrentRoute() {
+      await saveLastRouteSelection(this.query);
     },
     togglePlatform(platform: SupportedPlatform) {
       const idx = this.query.enabledPlatforms.indexOf(platform);

@@ -59,7 +59,7 @@ export default [
     },
   },
   {
-    files: ["agent-bridge/**/*.mjs"],
+    files: ["agent-bridge/**/*.mjs", "scripts/**/*.mjs"],
     languageOptions: {
       globals: {
         console: "readonly",
@@ -69,6 +69,10 @@ export default [
         clearTimeout: "readonly",
       },
     },
+  },
+  {
+    files: ["src/background/**/*.ts"],
+    languageOptions: { globals: { clearTimeout: "readonly" } },
   },
   {
     ignores: ["dist/**", "node_modules/**"],

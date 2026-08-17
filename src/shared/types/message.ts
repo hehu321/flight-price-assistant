@@ -1,11 +1,12 @@
 import { FlightLeg, FlightQuery, FlightResult, RoundTripPackageResult, SupportedPlatform } from "./flight";
-import { PlatformTaskState, PlatformTaskStatus, BlockingState, SearchContextValidation, AdapterDiagnosticReport } from "./platform";
+import { PlatformTaskState, BlockingState, SearchContextValidation } from "./platform";
 
 export type MessageType =
   | "START_COMPARISON"
   | "GET_CURRENT_SNAPSHOT"
   | "CANCEL_COMPARISON"
   | "RETRY_PLATFORM"
+  | "RETRY_ROUNDTRIP_PACKAGE"
   | "OPEN_PLATFORM_LOGIN"
   | "GET_AGENT_INTEGRATION_STATUS"
   | "UPDATE_AGENT_CLIENT_STATUS"
@@ -20,6 +21,8 @@ export type MessageType =
   | "BLOCKING_DETECTED"
   | "USER_ACTION_COMPLETED"
   | "RUN_DIAGNOSTICS"
+  | "GET_DIAGNOSTICS"
+  | "CLEAR_DIAGNOSTICS"
   | "DIAGNOSTICS_RESULT"
   | "OPEN_FLIGHT_BOOKING"
   | "BOOKING_PROGRESS";
@@ -41,6 +44,7 @@ export interface TaskStateChangedPayload {
   state: PlatformTaskState;
   results?: FlightResult[];
   packages?: RoundTripPackageResult[];
+  packageState?: PlatformTaskState;
 }
 
 export interface AdapterPackageProgressPayload {
@@ -74,6 +78,7 @@ export interface AdapterFailedPayload {
     message: string;
     retryable: boolean;
   };
+  collectionScope?: "package";
 }
 
 export interface BlockingDetectedPayload {
@@ -81,6 +86,7 @@ export interface BlockingDetectedPayload {
   platform: SupportedPlatform;
   state: BlockingState;
   message: string;
+  collectionScope?: "package";
 }
 
 export type BookingActionStatus =

@@ -10,6 +10,16 @@ export function initNavigationListener(): void {
 
       const binding = tabManager.getBindingByTabId(details.tabId);
       if (binding) {
+        if (binding.collectionScope === "package") {
+          if (isPlatformLoginPage(details.url)) {
+            taskManager.blockRoundTripPackage(binding.taskId, binding.platform, "login_required", `${getPlatformName(binding.platform)}往返套餐页面未登录，请完成登录后重新读取套餐`);
+            return;
+          }
+          taskManager.markRoundTripPackagePageReady(binding.taskId, binding.platform);
+          const task = taskManager.getActiveTask();
+          if (task?.id === binding.taskId) taskManager.requestAdapterExecution(details.tabId, binding.taskId, binding.platform, task.query);
+          return;
+        }
         if (taskManager.isBookingNavigation(details.tabId)) {
           logger.info(`订票跳转中，跳过结果提取: tabId=${details.tabId}`);
           return;

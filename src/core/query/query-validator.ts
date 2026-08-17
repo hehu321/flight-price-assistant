@@ -1,11 +1,12 @@
 import { FlightQuery } from "@/shared/types/flight";
+import { chinaDateString } from "@/shared/utils/china-date";
 
 export interface ValidationResult {
   valid: boolean;
   errors: string[];
 }
 
-export function validateFlightQuery(query: FlightQuery): ValidationResult {
+export function validateFlightQuery(query: FlightQuery, now = new Date()): ValidationResult {
   const errors: string[] = [];
 
   if (!query.originCity || query.originCity.trim() === "") {
@@ -24,7 +25,7 @@ export function validateFlightQuery(query: FlightQuery): ValidationResult {
     errors.push("出发地与目的地不能相同");
   }
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = chinaDateString(now);
   if (!query.departureDate) {
     errors.push("出发日期不能为空");
   } else if (query.departureDate < todayStr) {
