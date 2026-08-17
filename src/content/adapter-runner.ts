@@ -44,7 +44,7 @@ export async function runAdapterOnCurrentPage(taskId?: string, query?: FlightQue
       type: "BLOCKING_DETECTED",
       taskId,
       platform: adapter.id,
-      payload: { taskId, platform: adapter.id, state: blockingState, message: `触发阻断状态: ${blockingState}` },
+      payload: { taskId, platform: adapter.id, state: blockingState, collectionScope: adapter.id === "ctrip" && query && isCtripNativeRoundTripPage(query) ? "package" : undefined, message: `触发阻断状态: ${blockingState}` },
     });
     return;
   }
@@ -63,7 +63,7 @@ export async function runAdapterOnCurrentPage(taskId?: string, query?: FlightQue
       await sendToBackground({ type: "ADAPTER_PACKAGE_COMPLETED", taskId, platform: "ctrip", payload: { taskId, platform: "ctrip", packages } });
     } catch (error) {
       logger.error("携程往返套餐采集失败:", error);
-      await sendToBackground({ type: "ADAPTER_FAILED", taskId, platform: "ctrip", payload: { taskId, platform: "ctrip", error: { code: error instanceof Error ? error.message : "ROUNDTRIP_PACKAGE_FAILED", message: "携程往返套餐暂未读取到，可点击重新提取；去程和返程分段结果仍可参考", retryable: true } } });
+      await sendToBackground({ type: "ADAPTER_FAILED", taskId, platform: "ctrip", payload: { taskId, platform: "ctrip", collectionScope: "package", error: { code: error instanceof Error ? error.message : "ROUNDTRIP_PACKAGE_FAILED", message: "携程往返套餐暂未读取到", retryable: true } } });
     }
     return;
   }
@@ -92,7 +92,7 @@ export async function runAdapterOnCurrentPage(taskId?: string, query?: FlightQue
           payload: { taskId, platform: adapter.id, results, message },
         });
       });
-      const validResults = rawResults.map((result) => result.parsedResult!).filter(Boolean).map((result) => leg ? { ...result, leg, roundTripPricingMode: "split_fallback" as const } : result);
+      const validResults = applyRequestedConstraints(rawResults.map((result) => result.parsedResult!).filter(Boolean).map((result) => leg ? { ...result, leg, roundTripPricingMode: "split_fallback" as const } : result), query);
       if (validResults.length === 0) {
         if (hasExplicitEmptyState()) {
           sendToBackground({ type: "ADAPTER_EMPTY", taskId, platform: adapter.id, payload: { taskId, platform: adapter.id, message: "该平台明确显示暂无符合条件的航班" } });
@@ -137,7 +137,7 @@ export async function runAdapterOnCurrentPage(taskId?: string, query?: FlightQue
         type: "BLOCKING_DETECTED",
         taskId,
         platform: adapter.id,
-        payload: { taskId, platform: adapter.id, state: latestBlockingState, message: `触发阻断状态: ${latestBlockingState}` },
+        payload: { taskId, platform: adapter.id, state: latestBlockingState, collectionScope: adapter.id === "ctrip" && query && isCtripNativeRoundTripPage(query) ? "package" : undefined, message: `触发阻断状态: ${latestBlockingState}` },
       });
       return;
     }
@@ -177,10 +177,10 @@ export async function runAdapterOnCurrentPage(taskId?: string, query?: FlightQue
 
   // 4. 提取航班
   const rawResults = await adapter.extractFlights();
-  const validResults = rawResults
+  const validResults = applyRequestedConstraints(rawResults
     .map((r) => r.parsedResult!)
     .filter(Boolean)
-    .map((result) => leg ? { ...result, leg, roundTripPricingMode: "split_fallback" as const } : result);
+    .map((result) => leg ? { ...result, leg, roundTripPricingMode: "split_fallback" as const } : result), query);
 
   if (validResults.length === 0) {
     if (hasExplicitEmptyState()) {
@@ -274,6 +274,22 @@ async function enrichDisclosedFees(
     });
   }
   return enriched;
+}
+
+/** Apply only constraints that can be verified from the public result card.
+ * Other request parameters are carried to platform URLs/forms; adapters must
+ * never claim that a missing cabin or passenger selector was enforced. */
+function applyRequestedConstraints(results: FlightResult[], query?: FlightQuery): FlightResult[] {
+  if (!query) return results;
+  return results
+    .filter((flight) => !query.directOnly || flight.direct)
+    .map((flight) => {
+      const warnings = [...flight.warnings];
+      if (query.directOnly) warnings.push("已按页面直飞标识筛选");
+      if (query.cabinClass !== "economy" && !flight.cabin) warnings.push("页面未披露舱位，无法验证所选舱等");
+      if ((query.childCount || 0) > 0) warnings.push("页面结果未披露儿童票规则，需在订票页确认");
+      return { ...flight, warnings: [...new Set(warnings)] };
+    });
 }
 
 function hasExplicitEmptyState(): boolean {

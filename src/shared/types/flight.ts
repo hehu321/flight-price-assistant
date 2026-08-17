@@ -5,6 +5,9 @@ export type CabinClass = "economy" | "premium_economy" | "business" | "first";
 export type TripType = "oneway" | "roundtrip";
 export type FlightLeg = "outbound" | "inbound";
 export type RoundTripPricingMode = "native_package" | "split_fallback";
+/** Identifies what a displayed price actually represents.  Never infer a
+ * round-trip total from two independent one-way offers. */
+export type FlightResultScope = "oneway" | "roundtrip_outbound" | "roundtrip_inbound" | "roundtrip_package";
 
 export interface FlightQuery {
   tripType: TripType;
@@ -51,6 +54,8 @@ export interface FlightResult {
   leg?: FlightLeg;
   /** A split fallback is not a platform round-trip package price. */
   roundTripPricingMode?: RoundTripPricingMode;
+  /** Optional for records written by older releases. */
+  resultScope?: Exclude<FlightResultScope, "roundtrip_package">;
 
   marketingFlightNumber: string;
   operatingFlightNumber?: string;
@@ -119,6 +124,7 @@ export interface RoundTripFlightSegment {
 export interface RoundTripPackageResult {
   id: string;
   platform: SupportedPlatform;
+  resultScope: "roundtrip_package";
   outbound: RoundTripFlightSegment;
   inbound: RoundTripFlightSegment;
   /** Price explicitly labelled by the platform as the round-trip total. */

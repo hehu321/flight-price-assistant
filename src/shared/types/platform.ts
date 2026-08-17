@@ -41,6 +41,7 @@ export interface PlatformTaskState {
   taskId: string;
 
   tabId?: number;
+  leg?: FlightLeg;
   status: PlatformTaskStatus;
   progress: number;
   message: string;
@@ -62,12 +63,18 @@ export interface ComparisonTask {
   platforms: Record<SupportedPlatform, PlatformTaskState>;
   /** Native packages only; split one-way results remain in the normal store. */
   roundTripPackages?: Partial<Record<SupportedPlatform, RoundTripPackageResult[]>>;
+  /** Package collection has an independent lifecycle and must not overwrite
+   * the reliable outbound/inbound platform state. */
+  roundTripPackageStates?: Partial<Record<SupportedPlatform, PlatformTaskState>>;
 }
 
 export interface PlatformTabBinding {
   taskId: string;
   platform: SupportedPlatform;
   leg?: FlightLeg;
+  collectionScope?: "package";
+  /** Only extension-owned temporary collection tabs may be auto-closed. */
+  temporary?: boolean;
   tabId: number;
   createdAt: string;
 }

@@ -19,7 +19,12 @@ export async function extractTongchengFlights(): Promise<PlatformRawFlightResult
     const departureAirport = getCleanText(queryFirstAvailable(tongchengSelectors.departureAirport, card));
     const arrivalAirport = getCleanText(queryFirstAvailable(tongchengSelectors.arrivalAirport, card));
     const rawRouteText = `${departureAirport} -> ${arrivalAirport}`;
-    const date = new URL(window.location.href).searchParams.get("date") || new Date().toISOString().slice(0, 10);
+    const date = new URL(window.location.href).searchParams.get("date");
+    const departureTime = getCleanText(queryFirstAvailable(tongchengSelectors.departureTime, card));
+    const arrivalTime = getCleanText(queryFirstAvailable(tongchengSelectors.arrivalTime, card));
+    if (!date || !departureTime || !arrivalTime || !departureAirport || !arrivalAirport) return [];
+    const warnings = [...parsedPrice.warnings];
+    if (airline === "待确认航空公司") warnings.push("未能从同程卡片提取航空公司");
 
     const parsedResult: FlightResult = {
       id: generateId("tongcheng_flight"),
@@ -27,8 +32,8 @@ export async function extractTongchengFlights(): Promise<PlatformRawFlightResult
       marketingFlightNumber,
       airline,
       departureDate: date,
-      departureTime: getCleanText(queryFirstAvailable(tongchengSelectors.departureTime, card)),
-      arrivalTime: getCleanText(queryFirstAvailable(tongchengSelectors.arrivalTime, card)),
+      departureTime,
+      arrivalTime,
       arrivesNextDay: /\+1天|次日/.test(rawCardText),
       departureAirport,
       arrivalAirport,
@@ -45,11 +50,11 @@ export async function extractTongchengFlights(): Promise<PlatformRawFlightResult
       isStartingPrice: parsedPrice.isStartingPrice,
       currency: "CNY",
       queryContextValid: true,
-      confidence: 95,
+      confidence: airline === "待确认航空公司" ? 72 : 95,
       collectedAt: new Date().toISOString(),
       sourceUrl: window.location.href,
       rawPriceText,
-      warnings: parsedPrice.warnings,
+      warnings,
     };
     return [{ platform: "tongcheng" as const, rawCardText, rawPriceText, rawFlightNumberText, rawRouteText, parsedResult, warnings: [] }];
   });

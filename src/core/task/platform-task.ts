@@ -18,6 +18,9 @@ export function createComparisonTask(query: FlightQuery, taskId = generateId("ta
     createdAt: now,
     updatedAt: now,
     platforms: platformsState,
+    roundTripPackageStates: query.tripType === "roundtrip" && query.enabledPlatforms.includes("ctrip")
+      ? { ctrip: { ...createInitialPlatformTaskState("ctrip", taskId, now, true), message: "等待去程、返程分段结果后尝试套餐", retryable: true } }
+      : undefined,
   };
 }
 

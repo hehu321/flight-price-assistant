@@ -3,14 +3,14 @@ import { getAllPriceWatches, getDuePriceWatches, savePriceWatch, savePriceWatchE
 import { getAgentRun } from "@/core/storage/agent-repository";
 import { PriceWatch, PriceWatchEventType } from "@/shared/types/storage";
 import { ComparisonTask } from "@/shared/types/platform";
-import { FlightResult, SupportedPlatform } from "@/shared/types/flight";
+import { FlightResult, RoundTripPackageResult, SupportedPlatform } from "@/shared/types/flight";
 import { generateId } from "@/shared/utils/id-generator";
 import { runCoordinator } from "./run-coordinator";
 
 const ALARM_NAME = "flight-price-monitor";
 const IDLE_SECONDS = 10 * 60;
 const BLOCKED_NOTIFICATION_COOLDOWN_MS = 24 * 60 * 60 * 1000;
-const BLOCKED_STATUSES = new Set(["needs_user_action", "rate_limited", "page_changed"]);
+const BLOCKED_STATUSES = new Set(["needs_user_action", "login_required", "captcha_required", "sms_verification_required", "rate_limited", "page_changed"]);
 
 /**
  * Keeps scheduled monitoring strictly local to Chrome. It deliberately does
@@ -23,12 +23,19 @@ class PriceMonitorCoordinator {
   async initialize(): Promise<void> {
     if (this.initialized || typeof chrome === "undefined") return;
     this.initialized = true;
+    await this.disableLegacyRoundTripWatches();
     await this.ensureAlarm();
     chrome.alarms.onAlarm.addListener((alarm) => { if (alarm.name === ALARM_NAME) void this.poll(); });
     chrome.idle.onStateChanged.addListener((state) => { if (state === "active") void this.interruptForActivity(); });
     // A service worker restart loses listeners and in-memory active task state;
     // recreating this recurring alarm makes the next due run recover naturally.
     void this.poll();
+  }
+
+  private async disableLegacyRoundTripWatches(): Promise<void> {
+    const watches = await getAllPriceWatches();
+    await Promise.all(watches.filter((watch) => watch.query?.tripType === "roundtrip" && watch.priceScope !== "roundtrip_package" && watch.monitorEnabled)
+      .map((watch) => savePriceWatch({ ...watch, monitorEnabled: false, nextRunAt: undefined, lastOutcome: "blocked", lastError: "旧版往返关注未绑定原生套餐总价，已停止自动监控；请重新比价后重新开启" , updatedAt: new Date().toISOString() })));
   }
 
   async poll(): Promise<void> {
@@ -48,7 +55,9 @@ class PriceMonitorCoordinator {
     const run = await getAgentRun(task.id);
     if (!run || run.source !== "monitor" || !run.monitorWatchId || this.finalizing.has(task.id)) return;
     const states = run.query.enabledPlatforms.map((platform) => task.platforms[platform]);
-    const terminal = states.every((state) => ["completed", "empty", "failed", "cancelled", "rate_limited", "page_timeout", "interrupted", "needs_user_action", "page_changed"].includes(state.status));
+    const packageStates = run.query.tripType === "roundtrip" ? Object.values(task.roundTripPackageStates || {}) : [];
+    const terminal = states.every((state) => isTerminal(state.status))
+      && packageStates.every((state) => isTerminal(state.status));
     if (!terminal) return;
     this.finalizing.add(task.id);
     try {
@@ -59,12 +68,17 @@ class PriceMonitorCoordinator {
         return;
       }
       const successful = states.filter((state) => state.status === "completed" || state.status === "empty").length;
-      const blocked = states.find((state) => BLOCKED_STATUSES.has(state.status));
+      const blocked = [...states, ...packageStates].find((state) => BLOCKED_STATUSES.has(state.status));
       if (blocked) {
         await this.recordBlocked(watch, blocked.message || "平台需要用户处理");
         return;
       }
-      const price = lowestVerifiedPrice(results);
+      // A return journey is monitored only when a platform disclosed a real
+      // package total. Split-leg prices are useful reference data, never a
+      // substitute for a package monitoring baseline.
+      const price = task.query.tripType === "roundtrip"
+        ? lowestNativePackagePrice(task.roundTripPackages || {})
+        : lowestVerifiedPrice(results);
       const decision = recordMonitoringPrice(watch, price, successful);
       await savePriceWatch(decision.watch);
       if (decision.notification) await this.notify(watch, decision.notification.type, decision.notification.message, price, successful);
@@ -109,8 +123,18 @@ class PriceMonitorCoordinator {
   }
 }
 
+function isTerminal(status: string): boolean {
+  return ["completed", "empty", "failed", "cancelled", "rate_limited", "page_timeout", "interrupted", "needs_user_action", "page_changed"].includes(status);
+}
+
 function lowestVerifiedPrice(results: Record<SupportedPlatform, FlightResult[]>): number | undefined {
   const prices = Object.values(results).flat().flatMap((flight) => Number.isFinite(flight.totalPrice) ? [flight.totalPrice!] : []);
+  return prices.length ? Math.min(...prices) : undefined;
+}
+
+function lowestNativePackagePrice(packages: Partial<Record<SupportedPlatform, RoundTripPackageResult[]>>): number | undefined {
+  const prices = Object.values(packages).flat().map((item) => item.displayedTotalPrice)
+    .filter((price) => Number.isFinite(price) && price > 0);
   return prices.length ? Math.min(...prices) : undefined;
 }
 

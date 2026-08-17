@@ -1,4 +1,4 @@
-import { FlightQuery, FlightResult, SupportedPlatform } from "./flight";
+import { FlightQuery, FlightResult, RoundTripPackageResult, SupportedPlatform } from "./flight";
 import { PlatformTaskState } from "./platform";
 
 export type AgentRunStatus =
@@ -40,6 +40,8 @@ export interface AgentRun {
   queuePosition?: number;
   platformStates: Record<SupportedPlatform, PlatformTaskState>;
   results: Record<SupportedPlatform, FlightResult[]>;
+  roundTripPackages?: Partial<Record<SupportedPlatform, RoundTripPackageResult[]>>;
+  packageStates?: Partial<Record<SupportedPlatform, PlatformTaskState>>;
   warnings: string[];
 }
 
@@ -100,6 +102,23 @@ export interface AgentPublicFlight {
   collectedAt: string;
   resultPageUrl: string;
   warnings: string[];
+  leg?: FlightResult["leg"];
+  resultScope?: FlightResult["resultScope"];
+}
+
+export interface AgentPublicRoundTripPackage {
+  id: string;
+  platform: SupportedPlatform;
+  resultScope: "roundtrip_package";
+  outbound: RoundTripPackageResult["outbound"];
+  inbound: RoundTripPackageResult["inbound"];
+  displayedTotalPrice: number;
+  isStartingPrice: boolean;
+  currency: "CNY";
+  confidence: number;
+  collectedAt: string;
+  resultPageUrl: string;
+  warnings: string[];
 }
 
 export interface AgentRunResponse {
@@ -119,6 +138,8 @@ export interface AgentRunResponse {
   lowestDisplayedPrice?: number;
   platforms: Record<SupportedPlatform, Pick<PlatformTaskState, "status" | "progress" | "message" | "resultCount" | "errorCode" | "retryable" | "updatedAt">>;
   flights: AgentPublicFlight[];
+  packages?: AgentPublicRoundTripPackage[];
+  packageStates?: Partial<Record<SupportedPlatform, Pick<PlatformTaskState, "status" | "progress" | "message" | "resultCount" | "errorCode" | "retryable" | "updatedAt">>>;
   warnings: string[];
 }
 

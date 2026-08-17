@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "机票比价助手",
-  "version": "0.2.0",
+  "version": "0.0.3",
   "description": "对比携程、去哪儿、飞猪和同程的机票公开价格及价格趋势分析。",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqMe21cj+JXzpf1yNsnC0SpnmrYiwdUPbS5XZPgNTT7gQ2M1ND5BqfQD2KfzcdKpYpnrSj7DXM0V/xMeR5o8MA03wCQ3CDxQ4DhKVh+5NkzaZ3kZkpMmFJ4wpCtqvlYfJ00hz5nmbXGDGuEV85/JnxiHDZ5Y/Jq59iJbqApTzlgQudNPphc169AzPK8b5zO8qRw+TTfVCXAxki2u6jY4ZAHkYoXebRS71EcRGlO67ttukT9K4N3m1yr/TC2STp+g72IKEDuPrrlytJ4mOWGxW2NpL2N+A8F02eIOj6PpsoA6bMyg4xhxHN4ERi2BiOBump6aKxiHQSEuWKxMJsqwulwIDAQAB",
   "permissions": [

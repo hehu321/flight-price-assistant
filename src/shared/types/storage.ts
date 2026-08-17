@@ -1,4 +1,4 @@
-import { FlightPriceType, FlightQuery, FlightResult, SupportedPlatform } from "./flight";
+import { FlightPriceType, FlightQuery, FlightResult, RoundTripPackageResult, SupportedPlatform } from "./flight";
 import { PlatformTaskState } from "./platform";
 
 export interface LocalPriceRecord {
@@ -48,7 +48,13 @@ export interface QuerySnapshot {
   createdAt: string;
   updatedAt: string;
   platforms: Record<SupportedPlatform, Pick<PlatformTaskState, "status" | "message" | "resultCount" | "errorCode" | "updatedAt">>;
+  packageStates?: Partial<Record<SupportedPlatform, Pick<PlatformTaskState, "status" | "message" | "resultCount" | "errorCode" | "updatedAt">>>;
   results: Record<SupportedPlatform, FlightResult[]>;
+  roundTripPackages?: Partial<Record<SupportedPlatform, RoundTripPackageResult[]>>;
+  /** Missing on pre-governance snapshots. They are retained for review but
+   * excluded from round-trip statistics and monitoring. */
+  dataScopeVersion?: 2;
+  legacyRoundTripMixed?: boolean;
 }
 
 export interface CityAirportMapping {
@@ -93,6 +99,9 @@ export interface PriceWatch {
   lastOutcome?: "scheduled" | "completed" | "partial" | "blocked" | "failed" | "deferred";
   lastError?: string;
   targetReached?: boolean;
+  /** Required for a return journey: only a platform-disclosed package total
+   * can establish a monitoring baseline. */
+  priceScope?: "oneway" | "roundtrip_package";
   lastNotifiedAt?: string;
   lastNotifiedPrice?: number;
   createdAt: string;

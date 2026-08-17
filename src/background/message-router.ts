@@ -3,6 +3,7 @@ import { taskManager } from "./task-manager";
 import { logger } from "@/shared/logger/logger";
 import { runCoordinator } from "./run-coordinator";
 import { agentNativeBridge } from "./agent-native-bridge";
+import { clearDiagnostics, getDiagnostics } from "@/core/storage/diagnostic-repository";
 
 export function handleMessage(
   message: ExtensionMessage,
@@ -19,6 +20,16 @@ export function handleMessage(
 
     case "GET_AGENT_INTEGRATION_STATUS": {
       agentNativeBridge.getStatus().then((status) => sendResponse({ success: true, status }));
+      return true;
+    }
+
+    case "GET_DIAGNOSTICS": {
+      getDiagnostics().then((diagnostics) => sendResponse({ success: true, diagnostics }));
+      return true;
+    }
+
+    case "CLEAR_DIAGNOSTICS": {
+      clearDiagnostics().then(() => sendResponse({ success: true }));
       return true;
     }
 
@@ -61,8 +72,9 @@ export function handleMessage(
     }
 
     case "ADAPTER_FAILED": {
-      const { taskId, platform, error, leg } = message.payload as any;
-      taskManager.failPlatform(taskId, platform, error, leg);
+      const { taskId, platform, error, leg, collectionScope } = message.payload as any;
+      if (collectionScope === "package") taskManager.failRoundTripPackage(taskId, platform, error);
+      else taskManager.failPlatform(taskId, platform, error, leg);
       sendResponse({ success: true });
       return false;
     }
@@ -90,6 +102,12 @@ export function handleMessage(
       return true;
     }
 
+    case "RETRY_ROUNDTRIP_PACKAGE": {
+      const { taskId, platform } = message.payload as { taskId: string; platform: any };
+      taskManager.retryRoundTripPackage(taskId, platform).then(() => sendResponse({ success: true }));
+      return true;
+    }
+
     case "OPEN_PLATFORM_LOGIN": {
       const { taskId, platform } = message.payload as { taskId: string; platform: any };
       taskManager.openPlatformLogin(taskId, platform).then((opened) => sendResponse({ success: opened }));
@@ -109,8 +127,10 @@ export function handleMessage(
     }
 
     case "BLOCKING_DETECTED": {
-      const { taskId, platform, state, message: msg } = message.payload as any;
-      if (state === "login_required") {
+      const { taskId, platform, state, message: msg, collectionScope } = message.payload as any;
+      if (collectionScope === "package") {
+        taskManager.blockRoundTripPackage(taskId, platform, state, msg || undefined);
+      } else if (state === "login_required") {
         taskManager.requireLogin(taskId, platform, msg || undefined);
       } else {
         taskManager.updatePlatformStatus(taskId, platform, "needs_user_action", 50, msg || state);

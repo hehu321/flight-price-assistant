@@ -30,20 +30,29 @@ export async function extractFliggyFlights(): Promise<PlatformRawFlightResult[]>
     if (parsedPrice.amount === undefined) continue;
 
     const flightNumMatch = rawFlightNumberText.match(/([A-Z0-9]{2}\d{3,4})/);
-    const marketingFlightNumber = flightNumMatch ? flightNumMatch[1] : rawFlightNumberText;
-    const airline = rawFlightNumberText.replace(marketingFlightNumber, "").trim() || "中国国航";
+    const marketingFlightNumber = flightNumMatch ? flightNumMatch[1] : rawFlightNumberText || "待确认航班号";
+    const airline = rawFlightNumberText.replace(flightNumMatch?.[1] || "", "").trim() || "待确认航空公司";
+    const departureDate = new URL(window.location.href).searchParams.get("depDate");
+    const departureTime = getCleanText(depTimeEl);
+    const arrivalTime = getCleanText(arrTimeEl);
+    const departureAirport = getCleanText(depAirEl);
+    const arrivalAirport = getCleanText(arrAirEl);
+    if (!departureDate || !departureTime || !arrivalTime || !departureAirport || !arrivalAirport) continue;
+    const warnings = [...parsedPrice.warnings];
+    if (!flightNumMatch) warnings.push("未能从飞猪卡片提取标准航班号");
+    if (airline === "待确认航空公司") warnings.push("未能从飞猪卡片提取航空公司");
 
     const parsedResult: FlightResult = {
       id: generateId("fliggy_flight"),
       platform: "fliggy",
       marketingFlightNumber,
       airline,
-      departureDate: new URL(window.location.href).searchParams.get("depDate") || new Date().toISOString().split("T")[0],
-      departureTime: getCleanText(depTimeEl),
-      arrivalTime: getCleanText(arrTimeEl),
+      departureDate,
+      departureTime,
+      arrivalTime,
       arrivesNextDay: rawCardText.includes("+1天") || rawCardText.includes("次日"),
-      departureAirport: getCleanText(depAirEl),
-      arrivalAirport: getCleanText(arrAirEl),
+      departureAirport,
+      arrivalAirport,
       direct: !rawCardText.includes("经停"),
       displayedPrice: parsedPrice.amount,
       airportConstructionFee: parsedPrice.airportConstructionFee,
@@ -57,11 +66,11 @@ export async function extractFliggyFlights(): Promise<PlatformRawFlightResult[]>
       isStartingPrice: parsedPrice.isStartingPrice,
       currency: "CNY",
       queryContextValid: true,
-      confidence: 82,
+      confidence: flightNumMatch && airline !== "待确认航空公司" ? 82 : 68,
       collectedAt: new Date().toISOString(),
       sourceUrl: window.location.href,
       rawPriceText,
-      warnings: parsedPrice.warnings,
+      warnings,
     };
 
     rawResults.push({

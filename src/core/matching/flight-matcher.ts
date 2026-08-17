@@ -1,4 +1,4 @@
-import { FlightResult, SupportedPlatform } from "@/shared/types/flight";
+import { FlightResult } from "@/shared/types/flight";
 import { MatchedFlightGroup } from "@/shared/types/matching";
 import { generateId } from "@/shared/utils/id-generator";
 

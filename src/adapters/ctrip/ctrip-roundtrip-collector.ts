@@ -44,7 +44,7 @@ export async function collectCtripRoundTripPackages(
       const key = `${outbound.marketingFlightNumber}|${outbound.departureTime}|${inbound.marketingFlightNumber}|${inbound.departureTime}|${packagePrice.amount}`;
       if (packages.has(key)) continue;
       packages.set(key, {
-        id: generateId("ctrip_roundtrip"), platform: "ctrip", outbound, inbound,
+        id: generateId("ctrip_roundtrip"), platform: "ctrip", resultScope: "roundtrip_package", outbound, inbound,
         displayedTotalPrice: packagePrice.amount, isStartingPrice: packagePrice.isStartingPrice,
         currency: "CNY", confidence: 92, collectedAt: new Date().toISOString(),
         sourceUrl: window.location.href, rawPriceText: packagePrice.rawText,

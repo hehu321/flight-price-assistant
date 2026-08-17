@@ -1,9 +1,10 @@
 import { openDB, IDBPDatabase } from "idb";
 import { LocalPriceRecord, FavoriteRoute, PriceWatch, PriceWatchEvent, QuerySnapshot } from "@/shared/types/storage";
 import { AgentClient, AgentRun } from "@/shared/types/agent";
+import { DiagnosticRecord } from "@/shared/types/diagnostic";
 
 const DB_NAME = "FlightPriceAssistantDB";
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 export interface FlightPriceDB {
   priceRecords: LocalPriceRecord;
@@ -13,6 +14,7 @@ export interface FlightPriceDB {
   priceWatchEvents: PriceWatchEvent;
   agentRuns: AgentRun;
   agentClients: AgentClient;
+  diagnostics: DiagnosticRecord;
 }
 
 let dbPromise: Promise<IDBPDatabase<FlightPriceDB>> | null = null;
@@ -53,6 +55,10 @@ export function getDB(): Promise<IDBPDatabase<FlightPriceDB>> {
         if (!db.objectStoreNames.contains("agentClients")) {
           const store = db.createObjectStore("agentClients", { keyPath: "id" });
           store.createIndex("by_status", "status");
+        }
+        if (!db.objectStoreNames.contains("diagnostics")) {
+          const store = db.createObjectStore("diagnostics", { keyPath: "id" });
+          store.createIndex("by_createdAt", "createdAt");
         }
       },
     });

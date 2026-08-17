@@ -3,7 +3,7 @@
     <header><span class="platform">携程往返套餐</span><span class="price">¥{{ item.displayedTotalPrice }}<small v-if="item.isStartingPrice">起</small></span></header>
     <section class="route"><span class="label">去程</span><strong>{{ item.outbound.departureTime }}</strong><span>{{ item.outbound.departureAirport }}</span><i>→</i><strong>{{ item.outbound.arrivalTime }}</strong><span>{{ item.outbound.arrivalAirport }}</span></section>
     <section class="route"><span class="label">返程</span><strong>{{ item.inbound.departureTime }}</strong><span>{{ item.inbound.departureAirport }}</span><i>→</i><strong>{{ item.inbound.arrivalTime }}</strong><span>{{ item.inbound.arrivalAirport }}</span></section>
-    <footer>{{ item.outbound.marketingFlightNumber }} · {{ item.outbound.airline }}　/　{{ item.inbound.marketingFlightNumber }} · {{ item.inbound.airline }}<em>平台标注的往返总价，最终以订票页为准</em></footer>
+    <footer>{{ item.outbound.marketingFlightNumber }} · {{ item.outbound.airline }} / {{ item.inbound.marketingFlightNumber }} · {{ item.inbound.airline }}<em>平台标注的往返总价，最终以订票页为准</em></footer>
   </article>
 </template>
 <script setup lang="ts">

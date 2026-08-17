@@ -38,6 +38,7 @@ function handleRuntimeMessage(message: ExtensionMessage) {
   if (taskStore.currentTask?.id !== payload.taskId) return;
 
   taskStore.updatePlatformState(payload.platform, payload.state);
+  if (payload.packageState) taskStore.updatePackageState(payload.platform, payload.packageState);
   if (payload.results) {
     resultsStore.addPlatformResults(payload.platform, payload.results);
   }
