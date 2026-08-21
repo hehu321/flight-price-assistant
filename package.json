@@ -1,6 +1,6 @@
 {
   "name": "flight-price-assistant",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "机票多平台比价与价格趋势分析 Chrome 浏览器插件",
   "type": "module",
   "scripts": {

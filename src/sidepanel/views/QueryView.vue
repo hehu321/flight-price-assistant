@@ -12,19 +12,32 @@
         <a-radio-button value="roundtrip">往返</a-radio-button>
       </a-radio-group>
 
+      <div class="market-selector">
+        <label>查询市场</label>
+        <a-radio-group :value="queryStore.query.market || 'domestic'" button-style="solid" @update:value="queryStore.setMarket($event)">
+          <a-radio-button value="domestic">国内</a-radio-button>
+          <a-radio-button value="international_hmt">国际·港澳台</a-radio-button>
+        </a-radio-group>
+        <small v-if="queryStore.query.market === 'international_hmt'">请从候选项中选择城市、机场或 IATA 代码；同程会显示航线支持状态。</small>
+      </div>
+
       <div class="form-row">
         <CityInput
           label="出发城市"
           :model-value="queryStore.query.originCity"
-          placeholder="如: 武汉"
+          :market="queryStore.query.market"
+          :placeholder="queryStore.query.market === 'international_hmt' ? '如: 东京 / TYO' : '如: 武汉'"
           @update:model-value="(value) => queryStore.setCity('origin', value)"
+          @select="(location) => queryStore.setLocation('origin', location)"
         />
         <a-button class="swap-icon" shape="circle" aria-label="交换出发城市和到达城市" @click="swapCities"><SwapOutlined /></a-button>
         <CityInput
           label="到达城市"
           :model-value="queryStore.query.destinationCity"
-          placeholder="如: 北京"
+          :market="queryStore.query.market"
+          :placeholder="queryStore.query.market === 'international_hmt' ? '如: 新加坡 / SIN' : '如: 北京'"
           @update:model-value="(value) => queryStore.setCity('destination', value)"
+          @select="(location) => queryStore.setLocation('destination', location)"
         />
       </div>
 
@@ -109,10 +122,13 @@ onMounted(() => {
 function swapCities() {
   const tmp = queryStore.query.originCity;
   const tmpCode = queryStore.query.originCityCode;
+  const tmpLocation = queryStore.query.originLocation;
   queryStore.query.originCity = queryStore.query.destinationCity;
   queryStore.query.originCityCode = queryStore.query.destinationCityCode;
+  queryStore.query.originLocation = queryStore.query.destinationLocation;
   queryStore.query.destinationCity = tmp;
   queryStore.query.destinationCityCode = tmpCode;
+  queryStore.query.destinationLocation = tmpLocation;
 }
 
 function handleStartComparison() {
@@ -148,6 +164,7 @@ function handleStartComparison() {
 .trip-type-selector :deep(.ant-radio-button-wrapper) {
   flex: 1;
 }
+.market-selector{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);margin:-4px 0 var(--space-4)}.market-selector label{font-size:var(--font-caption);font-weight:600;color:var(--text-secondary)}.market-selector small{width:100%;font-size:var(--font-caption);line-height:1.45;color:var(--text-muted)}
 .form-row{display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-4);min-width:0}
 .form-row :deep(.city-input-wrapper) {
   flex: 1 1 0;

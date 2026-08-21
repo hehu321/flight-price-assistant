@@ -33,6 +33,10 @@ export function matchFlightsAcrossPlatforms(results: FlightResult[]): MatchedFli
 
 export function isSameFlight(a: FlightResult, b: FlightResult): boolean {
   if (a.departureDate !== b.departureDate) return false;
+  // A flight number alone is insufficient for international/codeshare pages;
+  // never merge results from distinct airport pairs or markets.
+  if (a.departureAirport !== b.departureAirport || a.arrivalAirport !== b.arrivalAirport) return false;
+  if ((a.market || "domestic") !== (b.market || "domestic")) return false;
 
   // 营销航班号或实际承运航班号一致
   const flightNumMatch =

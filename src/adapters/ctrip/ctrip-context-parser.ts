@@ -1,6 +1,7 @@
 import { FlightQuery } from "@/shared/types/flight";
 import { SearchContextValidation } from "@/shared/types/platform";
 import { normalizeCityName } from "@/core/query/city-normalizer";
+import { queryLocationCode } from "@/core/query/international-location-dictionary";
 
 export async function validateCtripContext(query: FlightQuery): Promise<SearchContextValidation> {
   const url = window.location.href;
@@ -12,8 +13,8 @@ export async function validateCtripContext(query: FlightQuery): Promise<SearchCo
 
   // 从 URL 或 DOM 节点获取校验证据
   const urlUpper = url.toUpperCase();
-  const hasOrigin = urlUpper.includes(query.originCityCode || "WUH") || document.body.innerText.includes(originNorm);
-  const hasDest = urlUpper.includes(query.destinationCityCode || "BJS") || document.body.innerText.includes(destNorm);
+  const hasOrigin = urlUpper.includes(queryLocationCode(query, "origin")) || document.body.innerText.includes(originNorm);
+  const hasDest = urlUpper.includes(queryLocationCode(query, "destination")) || document.body.innerText.includes(destNorm);
   const hasDate = url.includes(query.departureDate) || document.body.innerText.includes(query.departureDate);
   const hasReturnDate = query.tripType !== "roundtrip" || !query.returnDate
     || url.includes(query.returnDate) || document.body.innerText.includes(query.returnDate);

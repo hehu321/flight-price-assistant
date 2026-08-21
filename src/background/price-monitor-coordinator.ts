@@ -124,7 +124,7 @@ class PriceMonitorCoordinator {
 }
 
 function isTerminal(status: string): boolean {
-  return ["completed", "empty", "failed", "cancelled", "rate_limited", "page_timeout", "interrupted", "needs_user_action", "page_changed"].includes(status);
+  return ["completed", "empty", "unsupported_route", "failed", "cancelled", "rate_limited", "page_timeout", "interrupted", "needs_user_action", "page_changed"].includes(status);
 }
 
 function lowestVerifiedPrice(results: Record<SupportedPlatform, FlightResult[]>): number | undefined {

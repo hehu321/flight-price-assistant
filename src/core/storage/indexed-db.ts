@@ -4,7 +4,7 @@ import { AgentClient, AgentRun } from "@/shared/types/agent";
 import { DiagnosticRecord } from "@/shared/types/diagnostic";
 
 const DB_NAME = "FlightPriceAssistantDB";
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 export interface FlightPriceDB {
   priceRecords: LocalPriceRecord;
@@ -22,13 +22,17 @@ let dbPromise: Promise<IDBPDatabase<FlightPriceDB>> | null = null;
 export function getDB(): Promise<IDBPDatabase<FlightPriceDB>> {
   if (!dbPromise) {
     dbPromise = openDB<FlightPriceDB>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
+      upgrade(db, _oldVersion, _newVersion, transaction) {
         if (!db.objectStoreNames.contains("priceRecords")) {
           const store = db.createObjectStore("priceRecords", { keyPath: "id" });
           store.createIndex("by_platform", "platform");
           store.createIndex("by_route", ["originCityCode", "destinationCityCode"]);
           store.createIndex("by_flightNumber", "flightNumber");
           store.createIndex("by_collectedAt", "collectedAt");
+          store.createIndex("by_market", "market");
+        } else {
+          const store = transaction.objectStore("priceRecords");
+          if (!store.indexNames.contains("by_market")) store.createIndex("by_market", "market");
         }
         if (!db.objectStoreNames.contains("favoriteRoutes")) {
           db.createObjectStore("favoriteRoutes", { keyPath: "id" });

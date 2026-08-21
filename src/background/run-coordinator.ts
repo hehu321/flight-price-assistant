@@ -23,7 +23,7 @@ import { PriceWatch } from "@/shared/types/storage";
 
 const ALL_PLATFORMS: SupportedPlatform[] = ["ctrip", "qunar", "fliggy", "tongcheng"];
 const RUN_RETENTION_MS = 24 * 60 * 60 * 1000;
-const TERMINAL_PLATFORM_STATUSES = new Set(["completed", "empty", "failed", "cancelled", "rate_limited", "page_timeout", "interrupted", "page_changed"]);
+const TERMINAL_PLATFORM_STATUSES = new Set(["completed", "empty", "unsupported_route", "failed", "cancelled", "rate_limited", "page_timeout", "interrupted", "page_changed"]);
 
 class RunCoordinator {
   private initialized = false;

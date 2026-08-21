@@ -1,11 +1,11 @@
-import { FlightResult, PlatformRawFlightResult } from "@/shared/types/flight";
+import { FlightQuery, FlightResult, PlatformRawFlightResult } from "@/shared/types/flight";
 import { queryAllAvailable, queryFirstAvailable } from "../base/selector-resolver";
 import { ctripSelectors } from "./ctrip-selectors";
 import { getCleanText } from "../base/dom-utils";
 import { parsePriceText } from "@/core/pricing/price-parser";
 import { generateId } from "@/shared/utils/id-generator";
 
-export async function extractCtripFlights(): Promise<PlatformRawFlightResult[]> {
+export async function extractCtripFlights(query?: FlightQuery): Promise<PlatformRawFlightResult[]> {
   const cards = queryAllAvailable(ctripSelectors.flightCard);
   const rawResults: PlatformRawFlightResult[] = [];
 
@@ -39,7 +39,7 @@ export async function extractCtripFlights(): Promise<PlatformRawFlightResult[]> 
       || "航空公司";
     const warnings = [...parsedPrice.warnings];
     if (!marketingFlightNumber) warnings.push("未能从携程卡片提取标准航班号");
-    const departureDate = new URL(window.location.href).searchParams.get("depdate")
+    const departureDate = query?.departureDate || new URL(window.location.href).searchParams.get("depdate")
       || new URL(window.location.href).searchParams.get("depDate");
     const departureTime = getCleanText(depTimeEl);
     const arrivalTime = getCleanText(arrTimeEl);
@@ -65,6 +65,7 @@ export async function extractCtripFlights(): Promise<PlatformRawFlightResult[]> 
       departureAirport,
       arrivalAirport,
       direct: !/经停|中转|转\d+次/.test(rawCardText),
+      segments: [{ marketingFlightNumber: marketingFlightNumber || "待确认航班号", airline, departureDate, departureTime, arrivalTime, departureAirport, arrivalAirport }],
       displayedPrice: parsedPrice.amount,
       airportConstructionFee: parsedPrice.airportConstructionFee,
       fuelSurcharge: parsedPrice.fuelSurcharge,
@@ -75,7 +76,9 @@ export async function extractCtripFlights(): Promise<PlatformRawFlightResult[]> 
       includesTax: parsedPrice.includesTax,
       priceType: parsedPrice.priceType,
       isStartingPrice: parsedPrice.isStartingPrice,
-      currency: "CNY",
+      currency: parsedPrice.currency,
+      market: query?.market === "international_hmt" || /international/i.test(window.location.href) || /出入境提醒|国际机票/.test(document.body.innerText || "") ? "international_hmt" : undefined,
+      priceUnit: "per_traveller",
       queryContextValid: true,
       confidence: 90,
       collectedAt: new Date().toISOString(),

@@ -1,5 +1,6 @@
 import { FlightResult, SupportedPlatform } from "@/shared/types/flight";
 import { MatchedFlightGroup } from "@/shared/types/matching";
+import { isComparableCnyFare } from "./fare-presentation";
 
 export type ResultSort = "recommended" | "price_asc" | "price_desc" | "depart_asc" | "depart_desc" | "arrive_asc" | "duration_asc";
 
@@ -39,12 +40,13 @@ export function groupOffers(group: MatchedFlightGroup): FlightResult[] {
   return Object.values(group.results).flatMap((items) => items || []);
 }
 
-export function groupLowestPrice(group: MatchedFlightGroup): number {
-  return Math.min(...groupOffers(group).map(priceOf));
+export function groupLowestPrice(group: MatchedFlightGroup): number | undefined {
+  const prices = groupOffers(group).filter((flight) => (flight.currency || "CNY") === "CNY").map(priceOf);
+  return prices.length ? Math.min(...prices) : undefined;
 }
 
 export function groupLowestVerifiedPrice(group: MatchedFlightGroup): number | undefined {
-  const prices = groupOffers(group).filter((flight) => flight.totalPrice !== undefined).map((flight) => flight.totalPrice!);
+  const prices = groupOffers(group).filter(isComparableCnyFare).map((flight) => flight.totalPrice!);
   return prices.length ? Math.min(...prices) : undefined;
 }
 
@@ -83,8 +85,8 @@ function matches(group: MatchedFlightGroup, filters: ResultFilterState): boolean
     && (!filters.departureAirports.length || filters.departureAirports.includes(representative.departureAirport))
     && (!filters.arrivalAirports.length || filters.arrivalAirports.includes(representative.arrivalAirport))
     && (filters.direct === "all" || (filters.direct === "direct" ? representative.direct : !representative.direct))
-    && (filters.minPrice === undefined || lowest >= filters.minPrice)
-    && (filters.maxPrice === undefined || lowest <= filters.maxPrice)
+    && (filters.minPrice === undefined || (lowest !== undefined && lowest >= filters.minPrice))
+    && (filters.maxPrice === undefined || (lowest !== undefined && lowest <= filters.maxPrice))
     && (!filters.verifiedOnly || verified !== undefined)
     && inPeriod(representative.departureTime, filters.departurePeriod)
     && inPeriod(representative.arrivalTime, filters.arrivalPeriod)
@@ -92,7 +94,7 @@ function matches(group: MatchedFlightGroup, filters: ResultFilterState): boolean
 }
 
 function compareGroups(a: MatchedFlightGroup, b: MatchedFlightGroup, sort: ResultSort): number {
-  const aPrice = groupLowestPrice(a); const bPrice = groupLowestPrice(b);
+  const aPrice = groupLowestPrice(a) ?? Number.POSITIVE_INFINITY; const bPrice = groupLowestPrice(b) ?? Number.POSITIVE_INFINITY;
   const fallback = toMinutes(a.representative.departureTime) - toMinutes(b.representative.departureTime);
   if (sort === "price_asc") return aPrice - bPrice || fallback;
   if (sort === "price_desc") return bPrice - aPrice || fallback;

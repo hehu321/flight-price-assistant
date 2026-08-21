@@ -14,20 +14,22 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { AutoComplete as AAutoComplete } from "ant-design-vue";
-import { searchAirports } from "@/core/query/airport-dictionary";
+import { searchLocations } from "@/core/query/airport-dictionary";
+import { FlightMarket } from "@/shared/types/flight";
 
 const props = defineProps<{
   label: string;
   modelValue: string;
+  market?: FlightMarket;
   placeholder?: string;
 }>();
 
 const emit = defineEmits(["update:modelValue", "select"]);
 
-const suggestions = computed(() => searchAirports(props.modelValue));
+const suggestions = computed(() => searchLocations(props.modelValue, props.market || "domestic"));
 const options = computed(() => suggestions.value.map((item) => ({
-  value: item.cityName,
-  label: `${item.cityName} (${item.cityCode})`,
+  value: item.displayName,
+  label: `${item.displayName}${item.englishName ? ` · ${item.englishName}` : ""} (${item.iataCode})`,
 })));
 
 function onSearch(val: string) {
@@ -36,7 +38,7 @@ function onSearch(val: string) {
 
 function onSelect(value: unknown) {
   const cityName = String(value);
-  const item = suggestions.value.find((candidate) => candidate.cityName === cityName);
+  const item = suggestions.value.find((candidate) => candidate.displayName === cityName);
   emit("update:modelValue", cityName);
   if (item) emit("select", item);
 }

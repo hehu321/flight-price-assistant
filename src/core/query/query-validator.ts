@@ -1,5 +1,6 @@
 import { FlightQuery } from "@/shared/types/flight";
 import { chinaDateString } from "@/shared/utils/china-date";
+import { isInternationalQuery, queryLocationCode } from "./international-location-dictionary";
 
 export interface ValidationResult {
   valid: boolean;
@@ -15,6 +16,11 @@ export function validateFlightQuery(query: FlightQuery, now = new Date()): Valid
 
   if (!query.destinationCity || query.destinationCity.trim() === "") {
     errors.push("到达城市不能为空");
+  }
+
+  if (isInternationalQuery(query)) {
+    if (!/^[A-Z]{3}$/.test(queryLocationCode(query, "origin"))) errors.push("国际航线请从候选项中选择明确的出发城市、机场或 IATA 代码");
+    if (!/^[A-Z]{3}$/.test(queryLocationCode(query, "destination"))) errors.push("国际航线请从候选项中选择明确的到达城市、机场或 IATA 代码");
   }
 
   if (

@@ -16,6 +16,7 @@ import { chooseClosestPricedControl, clickControl, findBookingControl, findFligh
 export class FliggyAdapter implements PlatformAdapter {
   id: SupportedPlatform = "fliggy";
   name: string = "飞猪旅行";
+  private activeQuery?: FlightQuery;
 
   matches(url: string): boolean {
     return FLIGGY_CONFIG.domains.some((d) => url.toLowerCase().includes(d.toLowerCase()));
@@ -29,7 +30,10 @@ export class FliggyAdapter implements PlatformAdapter {
     await fillFliggyForm(query);
   }
 
-  shouldSubmitSearch(): boolean {
+  shouldSubmitSearch(query?: FlightQuery): boolean {
+    // International URLs above are already the platform's canonical search
+    // result URLs.  Do not try to fill the domestic page form after a redirect.
+    if (query?.market === "international_hmt") return false;
     return queryAllAvailable(fliggySelectors.flightCard).length === 0
       && !!queryFirstAvailable(fliggySelectors.searchButton);
   }
@@ -48,11 +52,12 @@ export class FliggyAdapter implements PlatformAdapter {
   }
 
   async validateSearchContext(query: FlightQuery): Promise<SearchContextValidation> {
+    this.activeQuery = query;
     return validateFliggyContext(query);
   }
 
   async extractFlights(): Promise<PlatformRawFlightResult[]> {
-    return extractFliggyFlights();
+    return extractFliggyFlights(this.activeQuery);
   }
 
   async verifyPrice(flight: FlightResult): Promise<FlightResult> {

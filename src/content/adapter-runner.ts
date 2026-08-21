@@ -31,9 +31,40 @@ export async function runAdapterOnCurrentPage(taskId?: string, query?: FlightQue
 
   logger.info(`在页面中启动适配器: ${adapter.name}`);
 
-  if (query && adapter.fillSearchForm && adapter.shouldSubmitSearch?.()) {
+  if (query && adapter.fillSearchForm && adapter.shouldSubmitSearch?.(query)) {
     logger.info(`${adapter.name}需要通过页面表单发起查询`);
-    await adapter.fillSearchForm(query);
+    try {
+      await adapter.fillSearchForm(query);
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "SEARCH_FORM_FAILED";
+      logger.error(`${adapter.name}查询表单未能完成:`, error);
+      sendToBackground({
+        type: "ADAPTER_FAILED",
+        taskId,
+        platform: adapter.id,
+        payload: { taskId, platform: adapter.id, error: { code, message: "平台国际查询表单未完成，未进入结果页；请点击重试", retryable: true } },
+      });
+      return;
+    }
+
+    // 表单点击后应由导航监听器在新结果页重新执行适配器。留在首页继续
+    // 等待航班卡片会制造误导性的 60 秒超时，并可能覆盖新页面状态。
+    if (adapter.id === "qunar") {
+      window.setTimeout(() => {
+        if (/flight\.qunar\.com\/?(?:#.*)?$/.test(window.location.href)) {
+          sendToBackground({
+            type: "ADAPTER_FAILED",
+            taskId,
+            platform: adapter.id,
+            payload: { taskId, platform: adapter.id, error: { code: "QUNAR_INTERNATIONAL_SEARCH_NOT_NAVIGATED", message: "去哪儿国际表单未跳转结果页，请点击重试", retryable: true } },
+          });
+        }
+      // 国际城市联想和表单路由在慢网下会晚于首页初始渲染。此前 8 秒
+      // 就标记失败，后台随即关闭临时标签，用户既看不到页面也无法重试。
+      // 给页面完整提交窗口；失败时由后台保留标签供用户检查。
+      }, 20000);
+    }
+    return;
   }
 
   // 1. 阻断状态检测

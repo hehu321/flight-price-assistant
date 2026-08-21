@@ -18,9 +18,12 @@ export interface PlatformAdapter {
 
   buildSearchUrl(query: FlightQuery): string | null;
 
+  /** Return a clear, terminal state for routes a platform does not offer. */
+  supportsQuery?(query: FlightQuery): { supported: boolean; message?: string };
+
   fillSearchForm?(query: FlightQuery): Promise<void>;
 
-  shouldSubmitSearch?(): boolean;
+  shouldSubmitSearch?(query: FlightQuery): boolean;
 
   submitSearch?(): Promise<void>;
 

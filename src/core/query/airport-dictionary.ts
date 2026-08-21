@@ -1,5 +1,7 @@
 import { ALL_DOMESTIC_AIRPORTS } from "@/shared/constants/airports";
 import { CityAirportMapping } from "@/shared/types/storage";
+import { FlightLocation } from "@/shared/types/flight";
+import { searchInternationalLocations } from "./international-location-dictionary";
 
 export function findCityAirports(cityNameOrCode: string): CityAirportMapping | undefined {
   if (!cityNameOrCode) return undefined;
@@ -26,4 +28,22 @@ export function searchAirports(query: string): CityAirportMapping[] {
         (a) => a.airportName.toLowerCase().includes(q) || a.airportCode.toLowerCase().includes(q)
       )
   );
+}
+
+export function domesticMappingToLocation(item: CityAirportMapping): FlightLocation {
+  return {
+    displayName: item.cityName,
+    iataCode: item.cityCode,
+    type: "city",
+    countryOrRegion: "中国大陆",
+    market: "domestic",
+    aliases: item.aliases,
+    timeZone: "Asia/Shanghai",
+  };
+}
+
+export function searchLocations(query: string, market: "domestic" | "international_hmt"): FlightLocation[] {
+  return market === "international_hmt"
+    ? searchInternationalLocations(query)
+    : searchAirports(query).map(domesticMappingToLocation);
 }

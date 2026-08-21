@@ -6,16 +6,18 @@ import { buildQunarSearchUrl } from "./qunar-url-builder";
 import { fillQunarForm } from "./qunar-form-filler";
 import { detectQunarBlocking } from "./qunar-blocking-detector";
 import { validateQunarContext } from "./qunar-context-parser";
-import { extractQunarFlights } from "./qunar-flight-parser";
+import { extractQunarDisplayedPrice, extractQunarFlights } from "./qunar-flight-parser";
 import { verifyQunarPrice } from "./qunar-price-verifier";
 import { waitForResultsStable } from "../base/page-stability";
 import { qunarSelectors } from "./qunar-selectors";
 import { queryAllAvailable, queryFirstAvailable } from "../base/selector-resolver";
 import { chooseClosestPricedControl, clickControl, findFlightCard, waitForElement } from "../base/booking";
+import { isInternationalQuery } from "@/core/query/international-location-dictionary";
 
 export class QunarAdapter implements PlatformAdapter {
   id: SupportedPlatform = "qunar";
   name: string = "去哪儿旅行";
+  private activeQuery?: FlightQuery;
 
   matches(url: string): boolean {
     return QUNAR_CONFIG.domains.some((d) => url.toLowerCase().includes(d.toLowerCase()));
@@ -27,6 +29,10 @@ export class QunarAdapter implements PlatformAdapter {
 
   async fillSearchForm(query: FlightQuery): Promise<void> {
     await fillQunarForm(query);
+  }
+
+  shouldSubmitSearch(query: FlightQuery): boolean {
+    return isInternationalQuery(query) && /flight\.qunar\.com\/?(?:$|#)/.test(window.location.href);
   }
 
   async detectBlockingState(): Promise<BlockingState> {
@@ -43,11 +49,12 @@ export class QunarAdapter implements PlatformAdapter {
   }
 
   async validateSearchContext(query: FlightQuery): Promise<SearchContextValidation> {
+    this.activeQuery = query;
     return validateQunarContext(query);
   }
 
   async extractFlights(): Promise<PlatformRawFlightResult[]> {
-    return extractQunarFlights();
+    return extractQunarFlights(this.activeQuery);
   }
 
   async verifyPrice(flight: FlightResult): Promise<FlightResult> {
@@ -56,6 +63,14 @@ export class QunarAdapter implements PlatformAdapter {
 
   async diagnose(): Promise<AdapterDiagnosticReport> {
     const cards = queryAllAvailable(qunarSelectors.flightCard);
+    const stablePrices = cards.filter((card) => extractQunarDisplayedPrice(card).source !== "unavailable");
+    const missingSelectors = [
+      ["flightNumber", qunarSelectors.flightNumber],
+      ["departureTime", qunarSelectors.departureTime],
+      ["arrivalTime", qunarSelectors.arrivalTime],
+      ["departureAirport", qunarSelectors.departureAirport],
+      ["arrivalAirport", qunarSelectors.arrivalAirport],
+    ].filter(([, selectors]) => !queryFirstAvailable(selectors as string[])).map(([name]) => name as string);
     return {
       platformId: "qunar",
       currentUrl: window.location.href,
@@ -63,12 +78,12 @@ export class QunarAdapter implements PlatformAdapter {
       pageType: cards.length > 0 ? "results" : "unknown",
       selectorsMatched: {
         flightCard: cards.length > 0,
-        price: !!queryFirstAvailable(qunarSelectors.price),
+        price: stablePrices.length > 0,
       },
-      missingSelectors: [],
+      missingSelectors,
       detectedFlightCardsCount: cards.length,
-      successfulPriceExtractionsCount: cards.length,
-      failedPriceExtractionsCount: 0,
+      successfulPriceExtractionsCount: stablePrices.length,
+      failedPriceExtractionsCount: cards.length - stablePrices.length,
       adapterVersion: "0.1.0",
       timestamp: new Date().toISOString(),
     };

@@ -28,6 +28,7 @@ export type PlatformTaskStatus =
   | "verifying_price"
   | "completed"
   | "empty"
+  | "unsupported_route"
   | "rate_limited"
   | "page_timeout"
   | "interrupted"
