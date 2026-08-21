@@ -18,7 +18,7 @@
           <a-radio-button value="domestic">国内</a-radio-button>
           <a-radio-button value="international_hmt">国际·港澳台</a-radio-button>
         </a-radio-group>
-        <small v-if="queryStore.query.market === 'international_hmt'">请从候选项中选择城市、机场或 IATA 代码；同程会显示航线支持状态。</small>
+        <small v-if="queryStore.query.market === 'international_hmt'">国内城市可直接保留为国际航线端点；海外、港澳台城市请从候选项中选择城市、机场或 IATA 代码。</small>
       </div>
 
       <div class="form-row">

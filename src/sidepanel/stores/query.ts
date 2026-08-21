@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { FlightLocation, FlightMarket, FlightQuery, SupportedPlatform } from "@/shared/types/flight";
-import { findCityAirports } from "@/core/query/airport-dictionary";
+import { domesticMappingToLocation, findCityAirports } from "@/core/query/airport-dictionary";
 import { getLastRouteSelection, saveLastRouteSelection } from "@/core/storage/last-route-repository";
 
 const defaultDepartureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
@@ -30,17 +30,18 @@ export const useQueryStore = defineStore("query", {
     },
     setCity(kind: "origin" | "destination", cityName: string) {
       const city = findCityAirports(cityName);
+      const domesticLocation = city ? domesticMappingToLocation(city) : undefined;
       if (kind === "origin") {
         this.query.originCity = cityName;
         // Never retain a previous city code when the user starts typing a new
         // name.  This prevents a visible city and the platform URL diverging.
-        this.query.originCityCode = city?.cityCode;
-        this.query.originLocation = city ? { displayName: city.cityName, iataCode: city.cityCode, type: "city", countryOrRegion: "中国大陆", market: "domestic", timeZone: "Asia/Shanghai", aliases: city.aliases } : undefined;
+        this.query.originCityCode = domesticLocation?.iataCode;
+        this.query.originLocation = domesticLocation;
         return;
       }
       this.query.destinationCity = cityName;
-      this.query.destinationCityCode = city?.cityCode;
-      this.query.destinationLocation = city ? { displayName: city.cityName, iataCode: city.cityCode, type: "city", countryOrRegion: "中国大陆", market: "domestic", timeZone: "Asia/Shanghai", aliases: city.aliases } : undefined;
+      this.query.destinationCityCode = domesticLocation?.iataCode;
+      this.query.destinationLocation = domesticLocation;
     },
     setLocation(kind: "origin" | "destination", location: FlightLocation) {
       if (kind === "origin") {
@@ -59,10 +60,25 @@ export const useQueryStore = defineStore("query", {
       if (market === "domestic") {
         this.synchronizeCityCodes();
       } else {
-        this.query.originLocation = undefined;
-        this.query.destinationLocation = undefined;
-        this.query.originCityCode = undefined;
-        this.query.destinationCityCode = undefined;
+        // 国内城市同样可以作为国际航线端点。保留已有的明确 IATA，
+        // 并把旧版仅存城市名的国内值补全为地点对象；用户无需再选一次。
+        this.hydrateDomesticEndpoint("origin");
+        this.hydrateDomesticEndpoint("destination");
+      }
+    },
+    hydrateDomesticEndpoint(kind: "origin" | "destination") {
+      const cityName = kind === "origin" ? this.query.originCity : this.query.destinationCity;
+      const currentLocation = kind === "origin" ? this.query.originLocation : this.query.destinationLocation;
+      const currentCode = kind === "origin" ? this.query.originCityCode : this.query.destinationCityCode;
+      const domestic = findCityAirports(cityName);
+      const location = currentLocation || (domestic ? domesticMappingToLocation(domestic) : undefined);
+      const code = location?.iataCode || currentCode;
+      if (kind === "origin") {
+        this.query.originLocation = location;
+        this.query.originCityCode = code;
+      } else {
+        this.query.destinationLocation = location;
+        this.query.destinationCityCode = code;
       }
     },
     synchronizeCityCodes() {
