@@ -9,6 +9,7 @@ import { ComparisonTask, PlatformTaskStatus } from "@/shared/types/platform";
 const UI_TERMINAL_STATUSES = new Set<PlatformTaskStatus>([
   "completed",
   "empty",
+  "unsupported_route",
   "failed",
   "cancelled",
   "rate_limited",

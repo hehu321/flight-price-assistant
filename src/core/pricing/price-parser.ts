@@ -1,4 +1,4 @@
-import { FlightPriceType, ParsedPrice } from "@/shared/types/flight";
+import { FlightCurrency, FlightPriceType, ParsedPrice } from "@/shared/types/flight";
 
 function amountForLabel(text: string, label: string): number | undefined {
   // Fee labels and their amount must be adjacent in the rendered price
@@ -8,11 +8,11 @@ function amountForLabel(text: string, label: string): number | undefined {
   return match ? parseInt(match[1].replace(/,/g, ""), 10) : undefined;
 }
 
-export function parsePriceText(rawText: string): ParsedPrice {
+export function parsePriceText(rawText: string, fallbackCurrency: FlightCurrency = "CNY"): ParsedPrice {
   if (!rawText) {
     return {
       rawText: "",
-      currency: "CNY",
+      currency: fallbackCurrency,
       isStartingPrice: false,
       priceType: "unknown",
       priceDisclosure: "base_only",
@@ -22,6 +22,7 @@ export function parsePriceText(rawText: string): ParsedPrice {
   }
 
   const text = rawText.trim();
+  const currency = detectCurrency(text, fallbackCurrency);
   const warnings: string[] = [];
   let priceType: FlightPriceType = "public";
 
@@ -41,7 +42,7 @@ export function parsePriceText(rawText: string): ParsedPrice {
   if (!digitsMatch) {
     return {
       rawText: text,
-      currency: "CNY",
+      currency,
       isStartingPrice,
       priceType,
       priceDisclosure: "base_only",
@@ -55,7 +56,7 @@ export function parsePriceText(rawText: string): ParsedPrice {
   if (numbers.length === 0) {
     return {
       rawText: text,
-      currency: "CNY",
+      currency,
       isStartingPrice,
       priceType,
       priceDisclosure: "base_only",
@@ -113,7 +114,7 @@ export function parsePriceText(rawText: string): ParsedPrice {
     fuelSurcharge,
     taxAmount,
     totalAmount,
-    currency: "CNY",
+    currency,
     isStartingPrice,
     includesTax,
     priceDisclosure,
@@ -121,4 +122,18 @@ export function parsePriceText(rawText: string): ParsedPrice {
     valid: true,
     warnings,
   };
+}
+
+/** Never assume that a foreign page's bare number is RMB.  Result adapters may
+ * provide their page context as a fallback; recognisable currency markers win. */
+function detectCurrency(text: string, fallback: FlightCurrency): FlightCurrency {
+  if (/HK\$|港币|港元/i.test(text)) return "HKD";
+  if (/MOP\$|澳门元/i.test(text)) return "MOP";
+  if (/NT\$|新台币|台币/i.test(text)) return "TWD";
+  if (/US\$|美元|\bUSD\b/i.test(text)) return "USD";
+  if (/\bJPY\b|日元|円/i.test(text)) return "JPY";
+  if (/\bEUR\b|欧元/i.test(text)) return "EUR";
+  if (/\bGBP\b|英镑/i.test(text)) return "GBP";
+  if (/￥|¥|人民币|元/.test(text)) return "CNY";
+  return fallback;
 }

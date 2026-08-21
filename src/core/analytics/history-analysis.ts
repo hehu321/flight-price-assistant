@@ -206,6 +206,7 @@ export function snapshotLowest(snapshot: QuerySnapshot): number | undefined {
     // visible as records, but never turn that into a false round-trip total.
     if (snapshot.dataScopeVersion !== 2) return undefined;
     const prices = Object.values(snapshot.roundTripPackages || {}).flat()
+      .filter((item) => item.currency === "CNY")
       .map((item) => item.displayedTotalPrice)
       .filter((price) => Number.isFinite(price) && price > 0);
     return prices.length ? Math.min(...prices) : undefined;
@@ -218,6 +219,7 @@ export function platformLowest(snapshot: QuerySnapshot, platform: SupportedPlatf
   if (snapshot.query.tripType === "roundtrip") {
     if (snapshot.dataScopeVersion !== 2) return undefined;
     const prices = (snapshot.roundTripPackages?.[platform] || [])
+      .filter((item) => item.currency === "CNY")
       .map((item) => item.displayedTotalPrice)
       .filter((price) => Number.isFinite(price) && price > 0);
     return prices.length ? Math.min(...prices) : undefined;

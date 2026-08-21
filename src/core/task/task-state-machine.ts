@@ -1,8 +1,8 @@
 import { PlatformTaskStatus } from "@/shared/types/platform";
 
 const ALLOWED_TRANSITIONS: Record<PlatformTaskStatus, PlatformTaskStatus[]> = {
-  idle: ["creating_tab", "page_timeout", "cancelled"],
-  creating_tab: ["opening", "loading", "failed", "page_timeout", "interrupted", "cancelled"],
+  idle: ["creating_tab", "unsupported_route", "page_timeout", "cancelled"],
+  creating_tab: ["opening", "loading", "unsupported_route", "failed", "page_timeout", "interrupted", "cancelled"],
   opening: ["loading", "login_required", "captcha_required", "failed", "page_timeout", "cancelled"],
   loading: [
     "filling_form",
@@ -30,6 +30,7 @@ const ALLOWED_TRANSITIONS: Record<PlatformTaskStatus, PlatformTaskStatus[]> = {
   verifying_price: ["completed", "empty", "failed", "page_timeout", "cancelled"],
   completed: ["idle", "creating_tab", "cancelled"],
   empty: ["idle", "creating_tab", "cancelled"],
+  unsupported_route: ["idle", "creating_tab", "cancelled"],
   rate_limited: ["idle", "creating_tab", "cancelled"],
   page_timeout: ["idle", "creating_tab", "cancelled"],
   interrupted: ["idle", "creating_tab", "cancelled"],

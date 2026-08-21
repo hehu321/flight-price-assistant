@@ -7,5 +7,8 @@ export async function detectFliggyBlocking(): Promise<BlockingState> {
   const url = window.location.href;
   if (url.includes("login=expired")) return "login_required";
   if (url.includes("captcha=true")) return "captcha";
+  if (/入参校验失败[：:]出发城市三字码或到达城市三字码查不到城市信息/.test(document.body?.innerText || "")) {
+    return "page_changed";
+  }
   return result.state;
 }

@@ -1,4 +1,11 @@
 export const qunarSelectors = {
+  // The international form is a second, independent form on Qunar's
+  // homepage.  Never query its controls from document scope: the domestic
+  // form appears first and has the same field names.
+  internationalForm: ["#ifsForm"],
+  // 去哪儿首页默认展示国内表单；必须先切换这个顶部市场 Tab，国际表单
+  // 中的单程/往返 Radio 才会真正可见、可交互。
+  internationalMarketTab: ["#js_inter_tab a", "#js_inter_tab", '[data-lnk="js_flighttype_tab_inter"]'],
   originInput: [
     '[data-qunar-input="origin"]',
     'input[name="fromCity"]',
@@ -18,6 +25,16 @@ export const qunarSelectors = {
     ".qunar-search-btn",
     'button[type="submit"]',
   ],
+  internationalTab: ["#searchTypeInterSng", ".js-searchtype-international", '[data-search-type="international"]'],
+  internationalRoundTripTab: ["#searchTypeInterRnd", '[data-search-type="international-roundtrip"]'],
+  citySuggestion: [
+    ".q-suggest tr[data-ind]",
+    ".e-ac-result li",
+    ".ac_result li",
+    ".city_sug li",
+    ".suggestion-item",
+  ],
+  internationalSearchButton: ["#ifsForm .btn_search", "#ifsForm button[type='submit']"],
   resultContainer: [
     ".e-airfly-list",
     ".e-airfly-wrap",
@@ -66,11 +83,22 @@ export const qunarSelectors = {
     ".airport-arr",
   ],
   price: [
+    // 国际列表 `.prc` 没有 aria-label；只匹配 aria-label 会让每张真实
+    // 国际卡片因为缺少报价而被解析器丢弃。
+    ".col-price .prc",
     '.col-price .prc[aria-label^="报价："]',
     ".qunar-price-text",
     ".b-airfly-price",
     ".price",
   ],
+  // 国际页 `.prc` 内是数字滚动动画，textContent 会把旧帧和当前帧拼成
+  // 例如 `¥175574`。`title` 才是去哪儿写入 DOM 的稳定金额。
+  stablePrice: [
+    ".col-price .fix_price[title]",
+    ".col-price [data-price]",
+    ".col-price .prc[aria-label]",
+  ],
+  priceDisclosure: [".col-price .vim"],
   bookingButton: [
     ".btn-book",
     ".btn-order",

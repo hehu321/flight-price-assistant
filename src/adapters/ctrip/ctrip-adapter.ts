@@ -16,6 +16,7 @@ import { clickControl, findBookingControl, findFlightCard, waitForElement } from
 export class CtripAdapter implements PlatformAdapter {
   id: SupportedPlatform = "ctrip";
   name: string = "携程旅行";
+  private activeQuery?: FlightQuery;
 
   matches(url: string): boolean {
     return CTRIP_CONFIG.domains.some((d) => url.toLowerCase().includes(d.toLowerCase()));
@@ -64,7 +65,7 @@ export class CtripAdapter implements PlatformAdapter {
     const minimumScrollRounds = 6;
 
     while (Date.now() - startedAt < collectionTimeoutMs) {
-      const rawResults = await extractCtripFlights();
+      const rawResults = await extractCtripFlights(this.activeQuery);
       let changed = false;
       for (const result of rawResults) {
         const flight = result.parsedResult;
@@ -120,11 +121,12 @@ export class CtripAdapter implements PlatformAdapter {
   }
 
   async validateSearchContext(query: FlightQuery): Promise<SearchContextValidation> {
+    this.activeQuery = query;
     return validateCtripContext(query);
   }
 
   async extractFlights(): Promise<PlatformRawFlightResult[]> {
-    return extractCtripFlights();
+    return extractCtripFlights(this.activeQuery);
   }
 
   async verifyPrice(flight: FlightResult): Promise<FlightResult> {

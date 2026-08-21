@@ -3,6 +3,26 @@ export type SupportedPlatform = "ctrip" | "qunar" | "fliggy" | "tongcheng";
 export type CabinClass = "economy" | "premium_economy" | "business" | "first";
 
 export type TripType = "oneway" | "roundtrip";
+/** Domestic mainland routes and international / HK, Macao and Taiwan routes use
+ * different platform pages and fare rules.  Keep the distinction on every
+ * query instead of inferring it later from a city name. */
+export type FlightMarket = "domestic" | "international_hmt";
+export type FlightLocationType = "city" | "airport";
+
+export interface FlightLocation {
+  displayName: string;
+  englishName?: string;
+  iataCode: string;
+  type: FlightLocationType;
+  countryOrRegion: string;
+  market: FlightMarket;
+  timeZone?: string;
+  aliases?: string[];
+}
+
+/** ISO 4217 code.  CNY has special comparison semantics in the first
+ * international release; other codes are display-only. */
+export type FlightCurrency = string;
 export type FlightLeg = "outbound" | "inbound";
 export type RoundTripPricingMode = "native_package" | "split_fallback";
 /** Identifies what a displayed price actually represents.  Never infer a
@@ -11,16 +31,19 @@ export type FlightResultScope = "oneway" | "roundtrip_outbound" | "roundtrip_inb
 
 export interface FlightQuery {
   tripType: TripType;
+  market?: FlightMarket;
 
   originCity: string;
   originCityCode?: string;
   originAirport?: string;
   originAirportCode?: string;
+  originLocation?: FlightLocation;
 
   destinationCity: string;
   destinationCityCode?: string;
   destinationAirport?: string;
   destinationAirportCode?: string;
+  destinationLocation?: FlightLocation;
 
   departureDate: string; // YYYY-MM-DD
   returnDate?: string; // YYYY-MM-DD
@@ -95,7 +118,15 @@ export interface FlightResult {
   isStartingPrice: boolean;
   includesTax?: boolean;
 
-  currency: "CNY";
+  currency: FlightCurrency;
+  /** Fares normally represent one traveller on result pages.  Do not infer a
+   * booking total when the platform has not disclosed it. */
+  priceUnit?: "per_traveller" | "per_booking" | "unknown";
+  market?: FlightMarket;
+  /** International itineraries can contain transfers and arrive on a local
+   * calendar date different from departure. */
+  arrivalDate?: string;
+  segments?: FlightSegment[];
 
   queryContextValid: boolean;
   confidence: number;
@@ -105,6 +136,21 @@ export interface FlightResult {
 
   rawPriceText: string;
   warnings: string[];
+}
+
+export interface FlightSegment {
+  marketingFlightNumber: string;
+  operatingFlightNumber?: string;
+  airline: string;
+  departureDate: string;
+  departureTime: string;
+  arrivalDate?: string;
+  arrivalTime: string;
+  departureAirport: string;
+  arrivalAirport: string;
+  departureTerminal?: string;
+  arrivalTerminal?: string;
+  stopInfo?: string;
 }
 
 /** A platform-disclosed round-trip option.  This is deliberately separate
@@ -130,7 +176,8 @@ export interface RoundTripPackageResult {
   /** Price explicitly labelled by the platform as the round-trip total. */
   displayedTotalPrice: number;
   isStartingPrice: boolean;
-  currency: "CNY";
+  currency: FlightCurrency;
+  market?: FlightMarket;
   confidence: number;
   collectedAt: string;
   sourceUrl: string;
@@ -161,7 +208,7 @@ export interface ParsedPrice {
   mandatoryFee?: number;
   totalAmount?: number;
 
-  currency: "CNY";
+  currency: FlightCurrency;
 
   isStartingPrice: boolean;
   includesTax?: boolean;

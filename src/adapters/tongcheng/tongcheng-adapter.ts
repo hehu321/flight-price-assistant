@@ -10,6 +10,7 @@ import { extractTongchengFlights } from "./tongcheng-flight-parser";
 import { verifyTongchengPrice } from "./tongcheng-price-verifier";
 import { tongchengSelectors } from "./tongcheng-selectors";
 import { buildTongchengSearchUrl } from "./tongcheng-url-builder";
+import { isInternationalQuery } from "@/core/query/international-location-dictionary";
 
 export class TongchengAdapter implements PlatformAdapter {
   id: SupportedPlatform = "tongcheng";
@@ -26,6 +27,11 @@ export class TongchengAdapter implements PlatformAdapter {
   }
 
   buildSearchUrl(query: FlightQuery): string | null { return buildTongchengSearchUrl(query); }
+  supportsQuery(query: FlightQuery) {
+    return isInternationalQuery(query)
+      ? { supported: false, message: "同程当前 PC 机票页未提供稳定的国际·港澳台查询入口" }
+      : { supported: true };
+  }
   async detectBlockingState(): Promise<BlockingState> { return detectTongchengBlocking(); }
 
   async waitForResults(): Promise<void> {

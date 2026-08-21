@@ -1,8 +1,10 @@
 import { FlightQuery } from "@/shared/types/flight";
 import { getCityCode } from "@/core/query/city-normalizer";
+import { isInternationalQuery } from "@/core/query/international-location-dictionary";
 
 /** 同程结果页接受 IATA 城市码，直接打开结果页可避免首页表单异步联想的不确定性。 */
 export function buildTongchengSearchUrl(query: FlightQuery): string | null {
+  if (isInternationalQuery(query)) return null;
   const originCode = (getCityCode(query.originCity) || query.originCityCode || query.originCity).toUpperCase();
   const destinationCode = (getCityCode(query.destinationCity) || query.destinationCityCode || query.destinationCity).toUpperCase();
   if (!originCode || !destinationCode || !query.departureDate) return null;

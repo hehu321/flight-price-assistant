@@ -1,6 +1,7 @@
 import { FlightQuery } from "@/shared/types/flight";
 import { SearchContextValidation } from "@/shared/types/platform";
 import { normalizeCityName } from "@/core/query/city-normalizer";
+import { queryLocationCode } from "@/core/query/international-location-dictionary";
 
 export async function validateQunarContext(query: FlightQuery): Promise<SearchContextValidation> {
   const matchedFields: string[] = [];
@@ -12,8 +13,8 @@ export async function validateQunarContext(query: FlightQuery): Promise<SearchCo
   const text = document.body ? document.body.innerText : "";
   const url = window.location.href;
 
-  const hasOrigin = text.includes(originNorm) || url.includes(encodeURIComponent(query.originCity));
-  const hasDest = text.includes(destNorm) || url.includes(encodeURIComponent(query.destinationCity));
+  const hasOrigin = text.includes(originNorm) || url.toUpperCase().includes(queryLocationCode(query, "origin")) || url.includes(encodeURIComponent(query.originCity));
+  const hasDest = text.includes(destNorm) || url.toUpperCase().includes(queryLocationCode(query, "destination")) || url.includes(encodeURIComponent(query.destinationCity));
   const hasDate = text.includes(query.departureDate) || url.includes(query.departureDate);
 
   if (hasOrigin) matchedFields.push("origin");

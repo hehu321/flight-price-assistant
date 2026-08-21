@@ -97,7 +97,7 @@ export interface AgentPublicFlight {
   priceType: FlightResult["priceType"];
   isStartingPrice: boolean;
   includesTax?: boolean;
-  currency: "CNY";
+  currency: string;
   confidence: number;
   collectedAt: string;
   resultPageUrl: string;
@@ -114,7 +114,7 @@ export interface AgentPublicRoundTripPackage {
   inbound: RoundTripPackageResult["inbound"];
   displayedTotalPrice: number;
   isStartingPrice: boolean;
-  currency: "CNY";
+  currency: string;
   confidence: number;
   collectedAt: string;
   resultPageUrl: string;

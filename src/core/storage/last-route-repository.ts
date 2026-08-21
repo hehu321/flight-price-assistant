@@ -1,4 +1,4 @@
-import { FlightQuery } from "@/shared/types/flight";
+import { FlightMarket, FlightQuery } from "@/shared/types/flight";
 
 const LAST_ROUTE_KEY = "last_successful_flight_route";
 
@@ -11,6 +11,7 @@ export interface LastRouteSelection {
   destinationCityCode?: string;
   destinationAirport?: string;
   destinationAirportCode?: string;
+  market?: FlightMarket;
   savedAt: string;
 }
 
@@ -28,6 +29,7 @@ export function createLastRouteSelection(query: FlightQuery, savedAt = new Date(
     destinationCityCode: normalizeOptionalText(query.destinationCityCode),
     destinationAirport: normalizeOptionalText(query.destinationAirport),
     destinationAirportCode: normalizeOptionalText(query.destinationAirportCode),
+    market: query.market,
     savedAt,
   };
 }
@@ -48,6 +50,7 @@ function parseLastRouteSelection(value: unknown): LastRouteSelection | null {
     destinationCityCode: normalizeOptionalText(candidate.destinationCityCode),
     destinationAirport: normalizeOptionalText(candidate.destinationAirport),
     destinationAirportCode: normalizeOptionalText(candidate.destinationAirportCode),
+    market: candidate.market === "international_hmt" ? "international_hmt" : "domestic",
     savedAt: normalizeOptionalText(candidate.savedAt) || new Date(0).toISOString(),
   };
 }

@@ -1,7 +1,7 @@
 <template>
   <div class="price-tag-wrapper">
     <span class="price-type-tag" :class="priceTypeClass">{{ fareLabel || priceTypeLabel }}</span>
-    <span class="price-val">¥{{ amount }}</span>
+    <span class="price-val">{{ currency === 'CNY' ? '¥' : `${currency} ` }}{{ amount }}</span>
     <span v-if="isStarting" class="starting-text">起</span>
   </div>
 </template>
@@ -15,6 +15,7 @@ const props = defineProps<{
   priceType: FlightPriceType;
   isStarting?: boolean;
   fareLabel?: string;
+  currency?: string;
 }>();
 
 const priceTypeLabel = computed(() => {

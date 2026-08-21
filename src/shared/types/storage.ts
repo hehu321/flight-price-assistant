@@ -1,4 +1,4 @@
-import { FlightPriceType, FlightQuery, FlightResult, RoundTripPackageResult, SupportedPlatform } from "./flight";
+import { FlightCurrency, FlightMarket, FlightPriceType, FlightQuery, FlightResult, RoundTripPackageResult, SupportedPlatform } from "./flight";
 import { PlatformTaskState } from "./platform";
 
 export interface LocalPriceRecord {
@@ -23,6 +23,8 @@ export interface LocalPriceRecord {
   fuelSurcharge?: number;
   taxAmount?: number;
   totalPrice?: number;
+  currency?: FlightCurrency;
+  market?: FlightMarket;
   priceDisclosure?: FlightResult["priceDisclosure"];
 
   priceType: FlightPriceType;

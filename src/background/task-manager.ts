@@ -95,6 +95,12 @@ class TaskManager {
       return;
     }
 
+    const support = adapter.supportsQuery?.(query);
+    if (support && !support.supported) {
+      this.updatePlatformStatus(taskId, platform, "unsupported_route", 100, support.message || "该平台暂未提供此国际航线");
+      return;
+    }
+
     const searchUrl = adapter.buildSearchUrl(query);
     if (!searchUrl) {
       this.failPlatform(taskId, platform, { code: "SEARCH_URL_UNAVAILABLE", message: "生成搜索链接失败", retryable: false }, leg);
@@ -289,7 +295,7 @@ class TaskManager {
     state.progress = progress;
     state.message = message;
     state.errorCode = errorCode;
-    state.retryable = !["completed", "empty", "cancelled"].includes(status);
+    state.retryable = !["completed", "empty", "unsupported_route", "cancelled"].includes(status);
     if (resultCount !== undefined) state.resultCount = resultCount;
     state.updatedAt = new Date().toISOString();
     this.activeTask.updatedAt = state.updatedAt;
@@ -483,7 +489,10 @@ class TaskManager {
       void this.finishOutboundAndRunInbound(taskId, platform);
     } else {
       this.updatePlatformStatus(taskId, platform, "failed", 0, error.message);
-      void this.closeCompletedPlatformTab(taskId, platform, leg);
+      // 手动查询失败时保留插件创建的结果页：国际表单、登录、限流或
+      // 页面改版都需要用户看到现场并在结果页点击重试。自动监控没有
+      // 用户在场，才继续关闭失败标签，避免后台积累页面。
+      if (this.monitorTaskIds.has(taskId)) void this.closeCompletedPlatformTab(taskId, platform, leg);
       if (leg === "inbound" && platform === "ctrip") void this.startNativePackageCollection(taskId, platform);
     }
     void this.restoreAfterCtripCollection(taskId, platform);
@@ -509,7 +518,7 @@ class TaskManager {
     this.clearTaskTimeout(taskId);
     for (const platform of Object.keys(this.activeTask.platforms) as SupportedPlatform[]) {
       const state = this.activeTask.platforms[platform];
-      if (!["completed", "empty", "failed", "cancelled"].includes(state.status)) {
+      if (!["completed", "empty", "unsupported_route", "failed", "cancelled"].includes(state.status)) {
         this.updatePlatformStatus(taskId, platform, "cancelled", state.progress, "任务已取消");
       }
     }
@@ -714,7 +723,11 @@ class TaskManager {
     const statuses = this.activeTask.query.enabledPlatforms.map((platform) => this.activeTask!.platforms[platform].status);
     if (!statuses.every(isTaskTerminalStatus)) return;
     if (!this.monitorTaskIds.has(taskId) && await this.shouldKeepPlatformTabs()) return;
-    if (!this.monitorTaskIds.has(taskId) && statuses.some((status) => status === "needs_user_action")) return;
+    // 手动任务的失败/超时页面是排障和“重新提取”的上下文，不能在所有
+    // 平台都结束时被全局清理器再次关闭。仅监控任务允许无条件清理。
+    if (!this.monitorTaskIds.has(taskId) && statuses.some((status) => [
+      "needs_user_action", "failed", "page_timeout", "page_changed", "interrupted",
+    ].includes(status))) return;
 
     this.tabCleanupTasks.add(taskId);
     try {
@@ -836,7 +849,7 @@ class TaskManager {
     code: string | undefined,
     message: string,
   ): Promise<void> {
-    await saveDiagnostic({ id: generateId("diagnostic"), taskId, platform, stage, level, code, message, adapterVersion: "0.0.3", createdAt: new Date().toISOString() });
+    await saveDiagnostic({ id: generateId("diagnostic"), taskId, platform, stage, level, code, message, adapterVersion: "0.0.4", createdAt: new Date().toISOString() });
   }
 
   private async shouldKeepPlatformTabs(): Promise<boolean> {
@@ -1092,7 +1105,7 @@ function platformName(platform: SupportedPlatform): string {
 function isTransientPlatformStatus(status: PlatformTaskStatus): boolean {
   return ![
     "completed",
-    "empty",
+    "empty", "unsupported_route",
     "failed",
     "cancelled",
     "rate_limited",
@@ -1104,7 +1117,7 @@ function isTransientPlatformStatus(status: PlatformTaskStatus): boolean {
 }
 
 function isTaskTerminalStatus(status: PlatformTaskStatus): boolean {
-  return ["completed", "empty", "failed", "cancelled", "rate_limited", "page_timeout", "interrupted", "needs_user_action", "page_changed"].includes(status);
+  return ["completed", "empty", "unsupported_route", "failed", "cancelled", "rate_limited", "page_timeout", "interrupted", "needs_user_action", "page_changed"].includes(status);
 }
 
 function tagRoundTripLeg(results: FlightResult[], leg?: FlightLeg): FlightResult[] {
